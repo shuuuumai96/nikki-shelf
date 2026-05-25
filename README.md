@@ -123,9 +123,16 @@ The backend Go module lives under `backend/` and uses the public module path `gi
 
 Repository formatting:
 
+```bash
+python3 scripts/format.py
+python3 scripts/format.py --check
+```
+
+On Windows, if `python3` is not available on PATH:
+
 ```powershell
-.\scripts\format.ps1
-.\scripts\format-check.ps1
+.\scripts\format.py
+.\scripts\format.py --check
 ```
 
 Repository checks and Docker commands:
