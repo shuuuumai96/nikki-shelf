@@ -1,0 +1,57 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: nikki
+      POSTGRES_USER: nikki
+      POSTGRES_PASSWORD: nikki
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nikki -d nikki"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - nikki_postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NIKKI_ADDR: ":8080"
+      NIKKI_DATABASE_URL: "postgres://nikki:nikki@postgres:5432/nikki?sslmode=disable"
+      NIKKI_UPLOAD_DIR: "/uploads"
+      NIKKI_PUBLIC_UPLOAD_BASE: "/uploads"
+    ports:
+      - "8080:8080"
+    volumes:
+      - nikki_uploads:/uploads
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+
+  frontend:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "8089:80"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+
+volumes:
+  nikki_postgres_data:
+  nikki_uploads:

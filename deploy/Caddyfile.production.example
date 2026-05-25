@@ -1,0 +1,23 @@
+# Nikki public production Caddyfile example.
+#
+# Before using a real domain, point DNS for that domain to the EC2 public IP
+# or Elastic IP. Replace diary.example.com only after DNS is correct.
+#
+# Required EC2 Security Group inbound rules:
+# - 443/tcp: open to intended public clients; required for HTTPS.
+# - 80/tcp: open only if needed for ACME HTTP-01 or HTTP-to-HTTPS redirect.
+# - 22/tcp: keep closed; use AWS SSM Session Manager instead of public SSH.
+# - 8080/tcp: keep closed; the backend must not be public.
+# - 5432/tcp: keep closed; PostgreSQL must not be public.
+
+diary.example.com {
+	encode zstd gzip
+	request_body {
+		max_size 16MB
+	}
+
+	# Caddy terminates public HTTPS on the host and proxies only to the
+	# frontend nginx container bound on localhost by docker-compose.prod.yml.
+	# Do not proxy directly to backend:8080 or PostgreSQL.
+	reverse_proxy 127.0.0.1:8089
+}

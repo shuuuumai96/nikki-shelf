@@ -1,0 +1,16 @@
+#!/bin/sh
+set -eu
+
+while read local_ref local_sha remote_ref remote_sha
+do
+case "$remote_ref" in
+refs/heads/master|refs/heads/main)
+echo "Blocked: direct push to $remote_ref is not allowed by Nikki's local pre-push hook." >&2
+echo "Create a feature branch, push that branch, and open a pull request instead." >&2
+echo "This hook is a local safety net only. It does not replace CI or server-side branch protection." >&2
+exit 1
+;;
+esac
+done
+
+exit 0

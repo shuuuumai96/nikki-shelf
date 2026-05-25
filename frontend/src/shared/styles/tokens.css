@@ -1,0 +1,79 @@
+:root {
+  color-scheme: light;
+
+  /* Palette */
+  --nikki-bg: #ffffff;
+  --nikki-bg-subtle: #fafafa;
+  --nikki-surface: #ffffff;
+  --nikki-surface-muted: #f5f5f5;
+  --nikki-text: #111111;
+  --nikki-text-muted: #737373;
+  --nikki-text-faint: #a3a3a3;
+  --nikki-border: #dbdbdb;
+  --nikki-border-subtle: #efefef;
+  --nikki-accent: #262626;
+  --nikki-accent-muted: #f2f2f2;
+  --nikki-danger: #b42318;
+  --nikki-radius-sm: 6px;
+  --nikki-radius-md: 8px;
+  --nikki-shadow-subtle: 0 1px 2px rgba(0, 0, 0, 0.04);
+
+  --color-bg: var(--nikki-bg);
+  --color-sidebar: var(--nikki-bg-subtle);
+  --color-surface: #ffffff;
+  --color-surface-soft: var(--nikki-surface-muted);
+  --color-text: var(--nikki-text);
+  --color-muted: var(--nikki-text-muted);
+  --color-border: var(--nikki-border);
+  --color-hover: var(--nikki-accent-muted);
+  --color-line: var(--nikki-border);
+  --color-wash: var(--nikki-bg-subtle);
+  --color-mint: #e8eee9;
+  --color-lemon: #f0ece0;
+  --color-lavender: #eceaf0;
+  --color-sky: #e7edf0;
+  --color-accent: var(--nikki-accent);
+  --color-accent-blue: #256f8f;
+  --color-danger: var(--nikki-danger);
+  --color-danger-bg: #fff7f6;
+  --color-danger-border: #f0c8c3;
+  --color-placeholder: var(--nikki-text-faint);
+  --color-text-soft: #525252;
+  --color-text-note: #666666;
+  --color-text-badge: #525252;
+  --color-text-code: #333333;
+  --color-text-tag: #404040;
+  --color-link: #1f6f8b;
+
+  /* Semantic surfaces */
+  --surface-glass: #ffffff;
+  --surface-glass-soft: #fafafa;
+  --surface-glass-solid: #ffffff;
+  --surface-chip-remove-hover: rgba(0, 0, 0, 0.06);
+  --bg-document: var(--nikki-bg);
+  --bg-main: var(--nikki-bg);
+  --bg-sidebar: var(--nikki-bg-subtle);
+  --surface-hover: var(--nikki-accent-muted);
+  --surface-active: #ededed;
+  --border-subtle: var(--nikki-border-subtle);
+  --border-control: var(--nikki-border);
+  --border-active: #bdbdbd;
+  --border-editor: var(--nikki-border-subtle);
+  --border-on-glass: var(--nikki-border-subtle);
+
+  /* Effects and sizing */
+  --shadow-control: none;
+  --shadow-search: none;
+  --shadow-mood: none;
+  --shadow-inset-glass: none;
+  --shadow-row-active: none;
+  --shadow-dot-ring: 0 0 0 1px rgba(0, 0, 0, 0.08);
+  --shadow-soft: var(--nikki-shadow-subtle);
+  --radius-sm: var(--nikki-radius-sm);
+  --radius-md: var(--nikki-radius-md);
+  --page-x: 42px;
+  --page-y: 42px;
+  --font-sans:
+    Inter, "Noto Sans JP", ui-sans-serif, system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
