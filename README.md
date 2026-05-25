@@ -131,8 +131,8 @@ python3 scripts/format.py --check
 On Windows, if `python3` is not available on PATH:
 
 ```powershell
-.\scripts\format.py
-.\scripts\format.py --check
+python .\scripts\format.py
+python .\scripts\format.py --check
 ```
 
 Repository checks and Docker commands:
