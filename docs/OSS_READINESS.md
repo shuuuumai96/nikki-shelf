@@ -6,9 +6,11 @@ Nikki is preparing for a future public self-hosted OSS direction. This checklist
 
 Nikki is licensed under Apache-2.0. The top-level `LICENSE` file contains the full Apache License, Version 2.0 text.
 
+The top-level `NOTICE` file contains project notice information. `THIRD_PARTY_NOTICES.md` contains a conservative informational summary of third-party dependency notices.
+
 ## Dependency License Audit
 
-A bounded manual/local dependency license review was performed on 2026-05-22 for the current dependency set. This was not legal advice, continuous compliance automation, or a claim of full legal compliance.
+A bounded manual/local dependency license review was performed on 2026-05-22 for the current dependency set. This was a manual current-tree review only, not continuous compliance automation or a claim of full legal compliance.
 
 Review inputs:
 
@@ -22,7 +24,7 @@ Review result:
 - `argparse@2.0.1`, a transitive frontend dependency of `markdown-it`, reports `Python-2.0`; treat it as a notice/redistribution item to preserve in release materials rather than ignoring it.
 - Backend Go module license files reviewed as MIT, ISC, or BSD-style licenses. The `golang.org/x/*` modules also include the standard Go project `PATENTS` file.
 
-Repeat this review before formal public releases and after dependency changes. Do not treat this note as a substitute for legal review where one is required.
+This dependency license review is still bounded and must be repeated before formal public releases and after dependency changes. Do not treat this note as a substitute for legal review where one is required.
 
 ## Security Policy
 

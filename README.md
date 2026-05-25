@@ -221,4 +221,6 @@ Deployment and release documents:
 
 ## License
 
-Nikki is licensed under Apache-2.0 (Apache License, Version 2.0). See [LICENSE](LICENSE).
+Nikki is licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE).
+
+Project notice information is in [NOTICE](NOTICE). Third-party dependency notices are summarized in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
