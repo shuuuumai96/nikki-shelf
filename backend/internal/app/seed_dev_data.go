@@ -140,6 +140,8 @@ func guardDevSeedEnvironment(cfg Config, allowOverride bool) error {
 	if allowOverride || strings.EqualFold(strings.TrimSpace(os.Getenv("NIKKI_ALLOW_DEV_SEED")), "true") {
 		return nil
 	}
+	// This command intentionally writes large fake datasets. Refuse to run when
+	// config looks production-like unless the operator opts in twice.
 	if cfg.CookieSecure {
 		return errors.New("refusing to seed because NIKKI_COOKIE_SECURE=true; set NIKKI_ALLOW_DEV_SEED=true only for local development")
 	}
@@ -188,6 +190,8 @@ func seedDevData(ctx context.Context, database *sql.DB, cfg Config, options seed
 		}
 	}
 
+	// Database writes and file writes cannot be one atomic transaction. Track
+	// files created before commit so failed inserts do not leave upload debris.
 	imagesCreated := []string{}
 	inserted := 0
 	imagesInserted := 0
@@ -317,6 +321,8 @@ func buildSeedEntries(count int, months int, now time.Time) []seedEntry {
 	entries := make([]seedEntry, 0, count)
 	used := map[string]bool{}
 	for i := 0; len(entries) < count && i < count*2; i++ {
+		// Spread entries across the requested date range but keep dates unique so
+		// normal user/date constraints stay exercised.
 		offset := 0
 		if count > 1 {
 			offset = int(math.Round(float64(i) * float64(availableDays-1) / float64(count-1)))

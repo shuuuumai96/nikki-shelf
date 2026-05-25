@@ -34,6 +34,8 @@ func NewClientIPExtractor(mode string, trustedCIDRs []string) ClientIPExtractor 
 			extractor.trusted = append(extractor.trusted, network)
 		}
 	}
+	// Forwarded headers are only meaningful behind explicitly trusted proxies.
+	// Without that allowlist, fall back to RemoteAddr and ignore spoofable input.
 	if extractor.mode != IPModeDirect && len(extractor.trusted) == 0 {
 		extractor.mode = IPModeDirect
 	}
@@ -59,6 +61,8 @@ func (e ClientIPExtractor) ClientIP(r *http.Request) string {
 
 func (e ClientIPExtractor) forwardedForIP(header string, direct string) string {
 	parts := strings.Split(header, ",")
+	// Walk from the nearest proxy backward; the first untrusted hop is the best
+	// client candidate when all later hops are trusted infrastructure.
 	for i := len(parts) - 1; i >= 0; i-- {
 		ip := parseIP(parts[i])
 		if ip == "" {

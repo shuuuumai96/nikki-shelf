@@ -202,6 +202,8 @@ export const useEntryStore = defineStore("entries", {
         return;
       }
 
+      // Autosave is a single-slot queue: newer edits replace the pending input
+      // while an older request is still in flight.
       this.latestAutosaveInput = cloneInput(input);
       this.autosaveRevision += 1;
       this.pendingAutosave = true;
@@ -225,6 +227,8 @@ export const useEntryStore = defineStore("entries", {
       this.autosaveInFlight = true;
       try {
         while (this.pendingAutosave && this.latestAutosaveInput) {
+          // A request may create the entry row, but only the newest revision may
+          // mark local text saved. Older responses leave the queue to continue.
           this.pendingAutosave = false;
           const revision = this.autosaveRevision;
           const input = cloneInput(this.latestAutosaveInput);
@@ -343,6 +347,8 @@ export const useEntryStore = defineStore("entries", {
       }
     },
     async createImageEntry(input: EntryInput): Promise<Entry> {
+      // Image upload needs a persisted entry id. Let pending autosave win first
+      // so upload creation does not race a simultaneous entry create.
       await this.waitForAutosaveIdle();
       if (this.activeEntry) {
         return this.activeEntry;

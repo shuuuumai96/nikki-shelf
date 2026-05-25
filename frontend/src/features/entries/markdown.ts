@@ -23,6 +23,8 @@ export function normalizeMarkdown(value: string) {
 
 export function normalizeMarkdownForRender(value: string) {
   const normalized = normalizeMarkdown(value);
+  // Turndown escapes leading Markdown markers when converting editor HTML back
+  // to text. Restore only when the source looks like repeatedly escaped blocks.
   return shouldRestoreEscapedMarkdownMarkers(normalized)
     ? restoreMarkdownSourceMarkers(normalized)
     : normalized;

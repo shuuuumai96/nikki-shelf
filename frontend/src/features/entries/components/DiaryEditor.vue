@@ -169,6 +169,8 @@ watch(
   ([entry, date]) => {
     const previousKey = activeEntryKey.value;
     const nextKey = entry ? `entry:${entry.id}` : `date:${date || todayISO()}`;
+    // A new-date draft becomes the same logical entry after the first autosave
+    // returns an id; keep local state through that promotion.
     const draftPromoted = Boolean(
       entry && previousKey === `date:${entry.entryDate}`,
     );
@@ -178,6 +180,8 @@ watch(
 
     clearAutosaveTimer();
     syncingFromProps.value = true;
+    // Local drafts preserve failed/offline edits, but readLocalDraft rejects
+    // them once the server version has moved beyond their base version.
     const savedDraft = readLocalDraft(nextKey, entry?.version ?? 0);
     const serverInput = entryToInput(entry, date);
     if (savedDraft) {
@@ -360,6 +364,8 @@ function scheduleAutosave() {
     return;
   }
 
+  // baselineInput is the last server-accepted form. localDirty is only the
+  // observable delta from that baseline, which keeps navigation checks simple.
   if (!hasFormChanged()) {
     localDirty.value = false;
     clearLocalDraft();
@@ -496,6 +502,8 @@ async function startPositionedUploads(
   items: UploadImageItem[],
   insertionPosition: number,
 ) {
+  // Run positioned uploads serially so each inserted image can advance the next
+  // markdown cursor. Parallel completion would scramble paste/drop order.
   let nextPosition = insertionPosition;
   for (const item of items) {
     item.insertionPosition = nextPosition;
@@ -647,6 +655,8 @@ function readLocalDraft(
     }
     const baseVersion =
       typeof parsed.baseVersion === "number" ? parsed.baseVersion : 0;
+    // Refuse stale drafts instead of merging blindly; newer server text should
+    // not be overwritten by a tab with an older base version.
     if (
       serverVersion > 0 &&
       (baseVersion === 0 || serverVersion > baseVersion)

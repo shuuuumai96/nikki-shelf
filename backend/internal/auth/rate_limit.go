@@ -73,6 +73,8 @@ func (r *RateLimiter) Allow(c echo.Context, username string) bool {
 
 	now := r.now()
 	r.cleanup(now)
+	// Require both dimensions to pass: IP slows broad spray attempts, account
+	// slows focused guessing from rotating addresses.
 	return r.bucketAllows(r.ipAttempts, r.ipKey(c), r.ipMaxAttempts, now) &&
 		r.bucketAllows(r.accountAttempts, accountKey(username), r.accountMax, now)
 }
@@ -143,6 +145,8 @@ func (r *RateLimiter) enforceMaxSize() {
 
 func trimMap(items map[string]rateBucket, max int) {
 	for len(items) > max {
+		// This is a memory cap, not an LRU policy. Any expired entries were
+		// already removed, so dropping arbitrary buckets is acceptable.
 		for key := range items {
 			delete(items, key)
 			break

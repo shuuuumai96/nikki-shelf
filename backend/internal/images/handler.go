@@ -48,6 +48,8 @@ func (h *Handler) upload(c echo.Context) error {
 	}
 
 	request := c.Request()
+	// Keep the transport limit slightly above one image to account for multipart
+	// overhead while still failing oversized bodies before parsing them.
 	request.Body = http.MaxBytesReader(c.Response().Writer, request.Body, maxImageRequestBytes)
 	if err := request.ParseMultipartForm(12 << 20); err != nil {
 		var maxBytesError *http.MaxBytesError
@@ -119,6 +121,8 @@ func (h *Handler) legacyContent(c echo.Context) error {
 	}
 
 	name := filepath.Base(c.Param("name"))
+	// Legacy /uploads URLs are still authenticated and resolved through the DB;
+	// reject path tricks before translating the name to a public_url lookup.
 	if name == "." || name != c.Param("name") || strings.ContainsAny(name, `/\`) {
 		return echo.ErrNotFound
 	}

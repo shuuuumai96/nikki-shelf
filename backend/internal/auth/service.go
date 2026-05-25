@@ -94,6 +94,8 @@ func (s *Service) Signup(ctx context.Context, input Credentials, bootstrapToken 
 	}
 
 	if userCount == 0 {
+		// Imported pre-auth entries belong to the first real account so upgrades
+		// from the single-user prototype do not orphan diary data.
 		if err := s.repo.ClaimLegacyEntries(ctx, row.ID); err != nil {
 			return SessionResult{}, err
 		}
@@ -127,6 +129,8 @@ func (s *Service) validFirstUserBootstrapToken(token string) bool {
 	}
 	expectedHash := hashToken(expected)
 	providedHash := hashToken(provided)
+	// Compare fixed-length digests so bootstrap token checks do not leak prefix
+	// matches or token length through timing.
 	return subtle.ConstantTimeCompare([]byte(expectedHash), []byte(providedHash)) == 1
 }
 
@@ -178,6 +182,8 @@ func (s *Service) UserWithCSRFByToken(ctx context.Context, token string) (User, 
 	}
 	user.CSRFToken = csrfToken
 
+	// Store only the token hash. The raw CSRF token exists in the response body
+	// and the frontend keeps it in memory, not in a readable cookie.
 	if err := s.repo.UpdateSessionCSRF(ctx, hashToken(token), hashToken(csrfToken)); err != nil {
 		return User{}, err
 	}
@@ -217,6 +223,7 @@ func (s *Service) startSession(ctx context.Context, row UserRow) (SessionResult,
 	}
 
 	expiresAt := s.now().Add(SessionTTL)
+	// Persist token hashes only; the cookie carries the raw session token once.
 	if err := s.repo.CreateSession(ctx, row.ID, hashToken(token), hashToken(csrfToken), expiresAt, s.now()); err != nil {
 		return SessionResult{}, err
 	}
