@@ -114,6 +114,8 @@ async function runSearch() {
     return;
   }
 
+  // Abort stops the network request; requestID also ignores stale completions
+  // from browsers or intermediaries that still resolve an older request.
   const currentRequest = requestID + 1;
   requestID = currentRequest;
   controller = new AbortController();

@@ -156,6 +156,8 @@ function includeSelectedEntry() {
     return;
   }
 
+  // Keep the active item mounted after a filter/page refresh so keyboard focus
+  // and aria-current do not point at an entry hidden by lazy rendering.
   visibleCount.value =
     Math.ceil((selectedIndex + 1) / visibleIncrement) * visibleIncrement;
 }
@@ -193,6 +195,8 @@ function createEntrySnippet(entry: Entry): EntrySnippet | null {
   const suffix = contextEnd < entry.body.length ? "..." : "";
   const leadingTrim = leadingTrimCount(contextText);
   const snippetText = `${prefix}${contextText.trim()}${suffix}`;
+  // Trimming leading whitespace shifts the visible match; compensate so the
+  // highlighted segment still lines up with the original body match.
   const adjustedIndex =
     prefix.length + Math.max(0, match.index - contextStart - leadingTrim);
   const segments = splitSnippet(snippetText, adjustedIndex, match.text.length);

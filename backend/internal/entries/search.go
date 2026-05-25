@@ -109,6 +109,8 @@ func buildSearchClauses(userID int64, filter SearchFilter) ([]string, []any) {
 	if filter.Query != "" {
 		pattern := ilikePattern(filter.Query)
 		placeholder := appendArg(&args, pattern)
+		// Keep the broad search as ILIKE for predictable small-instance behavior;
+		// exact filters below narrow the result set when precision matters.
 		clauses = append(clauses, `(e.title ILIKE `+placeholder+` ESCAPE '\' OR e.body ILIKE `+placeholder+` ESCAPE '\' OR e.mood ILIKE `+placeholder+` ESCAPE '\' OR e.tags_json::text ILIKE `+placeholder+` ESCAPE '\')`)
 	}
 	if filter.From != "" {
@@ -159,6 +161,8 @@ func ilikePattern(value string) string {
 }
 
 func escapeILike(value string) string {
+	// User text should not turn into SQL wildcards. The query clauses use
+	// ESCAPE '\' so literal %, _, and backslash are searchable.
 	replacer := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
 	return replacer.Replace(value)
 }
@@ -224,5 +228,7 @@ func previewStart(source string, query string) int {
 	if matchRune <= 40 {
 		return 0
 	}
+	// Center the preview near the first query hit without splitting multibyte
+	// text; byteIndex came from strings.Index, but slicing uses rune offsets.
 	return matchRune - 40
 }

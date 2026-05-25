@@ -86,6 +86,8 @@ func Middleware(logger *slog.Logger) echo.MiddlewareFunc {
 				c.Error(err)
 			}
 
+			// Echo handlers may write directly and return nil. Treat an unset
+			// status as OK so request logs do not emit status 0.
 			status := c.Response().Status
 			if status == 0 {
 				status = http.StatusOK
@@ -130,6 +132,8 @@ func Recover(logger *slog.Logger) echo.MiddlewareFunc {
 				if !c.Response().Committed {
 					_ = c.JSON(http.StatusInternalServerError, map[string]string{"error": internalMessage})
 				}
+				// Echo's outer error handler has already been bypassed by the
+				// recovered panic; returning nil prevents a duplicate response.
 				err = nil
 			}()
 
@@ -244,6 +248,8 @@ func newRequestID() string {
 	if _, err := rand.Read(bytes); err == nil {
 		return hex.EncodeToString(bytes)
 	}
+	// Logging should keep working even if the CSPRNG fails; this ID is for
+	// correlation, not authentication.
 	return strconv.FormatInt(time.Now().UnixNano(), 36)
 }
 

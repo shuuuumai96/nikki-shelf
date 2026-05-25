@@ -137,6 +137,8 @@ func safeImageURLs(images []entries.EntryImage) []string {
 }
 
 func isSafePublicURL(url string) bool {
+	// Markdown exports must not leak local file paths or inject extra Markdown
+	// lines through image URLs.
 	if strings.ContainsAny(url, "\r\n\t") {
 		return false
 	}

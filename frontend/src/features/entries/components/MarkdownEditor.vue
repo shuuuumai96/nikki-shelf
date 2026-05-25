@@ -116,10 +116,14 @@ const editor = useEditor({
     },
     handlePaste: (_view, event) => handleMarkdownPaste(event),
     handleScrollToSelection: () => {
+      // The page owns scrolling. Letting ProseMirror scroll on selection changes
+      // fights the fixed/sticky editor chrome in focus mode.
       return true;
     },
   },
   onCreate: () => {
+    // Wait for Vue and ProseMirror to paint before revealing the editor; the
+    // first layout pass otherwise flashes an unmeasured document surface.
     window.requestAnimationFrame(() => {
       window.requestAnimationFrame(() => {
         editorReady.value = true;
@@ -144,6 +148,8 @@ watch(
       return;
     }
 
+    // Prop updates come from server reloads or draft restores. Suppress
+    // ProseMirror's update event so the parent does not autosave the echo.
     instance.commands.setContent(renderEditorMarkdown(value), {
       emitUpdate: false,
     });
@@ -182,6 +188,8 @@ function handleMarkdownPaste(event: ClipboardEvent) {
     return false;
   }
 
+  // Plain text that looks like Markdown should stay Markdown. Browser paste
+  // would otherwise insert literal syntax into the rich editor document.
   event.preventDefault();
   if (instance.isEmpty) {
     instance.commands.setContent(renderEditorMarkdown(source), {
@@ -228,6 +236,8 @@ function insertImageAtPosition(position: number, image: InlineImage) {
     return null;
   }
 
+  // Return the post-insert selection so callers inserting several uploaded
+  // images can chain the next insertion after the image paragraph.
   instance
     .chain()
     .focus()
@@ -336,6 +346,8 @@ function dropPositionFromEvent(event: DragEvent) {
     return null;
   }
 
+  // Convert ProseMirror's nearest character position into a block boundary so
+  // dropped images land between paragraphs instead of splitting text nodes.
   return blockBoundaryPosition(result.pos, event.clientY);
 }
 

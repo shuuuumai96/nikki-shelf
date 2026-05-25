@@ -117,6 +117,8 @@ func (s *Service) backup(ctx context.Context, userID int64) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Count images before opening the zip so oversized backups fail without
+	// partially streaming or reading image files.
 	if imageCount > MaxBackupImages {
 		return nil, ErrExportTooLarge
 	}
@@ -200,6 +202,8 @@ func writeImageFile(archive *zip.Writer, row images.Row) error {
 	if err != nil {
 		return fmt.Errorf("read image %d: %w", row.ID, err)
 	}
+	// Store images by the generated basename only; absolute upload paths stay out
+	// of portable backup archives.
 	name := filepath.Base(row.FilePath)
 	file, err := archive.Create("images/" + name)
 	if err != nil {

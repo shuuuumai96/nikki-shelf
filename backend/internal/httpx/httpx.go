@@ -38,6 +38,8 @@ func DecodeJSONWithLimit(c echo.Context, out any, limitBytes int64) error {
 		return err
 	}
 
+	// Reject concatenated JSON values. Without this, a valid first object could
+	// hide trailing junk from handlers.
 	if err := decoder.Decode(&struct{}{}); err == nil {
 		return errors.New("request body must contain a single JSON value")
 	} else if !errors.Is(err, io.EOF) {

@@ -84,6 +84,8 @@ func (r *Repository) Update(ctx context.Context, userID int64, id int64, input U
 		return EntryRow{}, err
 	}
 	if affected == 0 {
+		// The version is part of the WHERE clause. Distinguish a stale write from
+		// a missing row so the client can show conflict recovery instead of 404.
 		exists, existsErr := r.ExistsForUser(ctx, userID, id)
 		if existsErr != nil {
 			return EntryRow{}, existsErr
@@ -142,6 +144,8 @@ func (r *Repository) ListPage(ctx context.Context, userID int64, request EntryPa
 	if cursor.EntryDate != "" {
 		cursorDate := appendArg(&args, cursor.EntryDate)
 		cursorID := appendArg(&args, cursor.ID)
+		// Keyset pagination must mirror ORDER BY entry_date DESC, id DESC. The id
+		// tiebreaker keeps pagination stable for multiple entries on a date.
 		clauses = append(clauses, "(entry_date < "+cursorDate+" OR (entry_date = "+cursorDate+" AND id < "+cursorID+"))")
 	}
 

@@ -61,6 +61,7 @@ func (s *LocalStorage) Save(_ context.Context, entryID int64, header *multipart.
 		return StoredFile{}, err
 	}
 
+	// Trust sniffed bytes instead of the client-supplied filename or MIME header.
 	ext, ok := imageExtensions[contentType]
 	if !ok {
 		return StoredFile{}, ErrInvalidImage
@@ -101,6 +102,8 @@ func (s *LocalStorage) writeImage(target *os.File, source multipart.File, conten
 	if s.stripMetadata {
 		switch contentType {
 		case "image/jpeg":
+			// Re-encoding strips metadata for formats the standard library can
+			// decode. Other supported formats are copied verbatim.
 			image, err := jpeg.Decode(source)
 			if err != nil {
 				return 0, ErrInvalidImage
@@ -164,6 +167,7 @@ func detectContentType(file multipart.File) (string, error) {
 		return "", err
 	}
 
+	// Rewind after sniffing so Save can write or decode the complete stream.
 	if _, err := file.Seek(0, io.SeekStart); err != nil {
 		return "", err
 	}

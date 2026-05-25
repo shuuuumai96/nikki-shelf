@@ -14,6 +14,8 @@ func currentStreak(entryDates []string, today time.Time) int {
 
 	cursor := today
 	if !dates[cursor.Format(time.DateOnly)] {
+		// A one-day grace period keeps yesterday's streak alive until the user has
+		// had a chance to write today's entry.
 		cursor = cursor.AddDate(0, 0, -1)
 		if !dates[cursor.Format(time.DateOnly)] {
 			return 0
