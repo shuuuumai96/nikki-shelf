@@ -11,8 +11,10 @@
 - Frontend install/build: `cd frontend && corepack pnpm install --frozen-lockfile && corepack pnpm build`
 - Frontend format: `cd frontend && corepack pnpm format`
 - Frontend format check: `cd frontend && corepack pnpm format:check`
-- Repository format: `.\scripts\format.ps1`
-- Repository format check: `.\scripts\format-check.ps1`
+- Repository format: `python3 scripts/format.py`
+- Repository format check: `python3 scripts/format.py --check`
+- Repository format on Windows if `python3` is unavailable: `python .\scripts\format.py`
+- Repository format check on Windows if `python3` is unavailable: `python .\scripts\format.py --check`
 - Backend test: `cd backend && go test ./...`
 - Docker build: `docker compose build`
 - Run app: `docker compose up -d`
