@@ -75,7 +75,7 @@ This gate is mandatory before opening Nikki to the public internet on the single
 | Public network exposure is limited | Security Group keeps `22/tcp`, `8080/tcp`, and `5432/tcp` closed; only `443/tcp` is required and `80/tcp` is temporary/optional |
 | Public Caddy proxy is correct | Caddy proxies to `127.0.0.1:8089`, uses public ACME TLS, enables compression, and allows at least `16MB` request bodies |
 | Production safety env is set | `NIKKI_COOKIE_SECURE=true`, exact `NIKKI_CORS_ALLOWED_ORIGINS`, `NIKKI_SIGNUP_ENABLED=false`, `NIKKI_FIRST_USER_SETUP_ENABLED=false`, `NIKKI_FIRST_USER_BOOTSTRAP_TOKEN` is a long random secret, and `NIKKI_STRIP_IMAGE_METADATA=true` |
-| Schema-changing release has backup first | Automatic idempotent schema setup is understood; versioned migrations are still a future hardening item |
+| Schema-changing release has backup first | Automatic idempotent schema setup is understood; do not add a migration framework unless an explicit task requests it |
 
 ## Unsupported In This Release
 

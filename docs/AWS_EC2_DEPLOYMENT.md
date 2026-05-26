@@ -240,9 +240,11 @@ Roll back code by checking out the previous reviewed revision, then rerun config
 
 ## Schema Changes
 
-Nikki currently uses automatic idempotent schema setup from `backend/internal/db/schema.sql` through the backend startup path. There is intentionally no versioned migration framework in this pass.
+Nikki currently uses automatic idempotent schema setup from `backend/internal/db/schema.sql` through the backend startup path. Versioned migrations are not implemented in this pass.
 
-Future production hardening should add versioned migrations. Until then, every schema-changing release requires a manual runbook:
+Do not add a migration framework unless an explicit task requests it.
+
+Every schema-changing release requires a manual runbook:
 
 1. Back up production data, including PostgreSQL and the matching uploads volume.
 2. Verify the backup with an isolated restore.
