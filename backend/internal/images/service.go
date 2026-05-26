@@ -81,6 +81,8 @@ func (s *Service) SaveMany(ctx context.Context, userID int64, entryID int64, hea
 		storedFiles = append(storedFiles, stored)
 	}
 
+	// Files hit disk before rows hit the database. If the transaction rejects
+	// quotas or image counts, remove every file created in this request.
 	rows, err := s.repo.CreateForUser(ctx, userID, entryID, storedFiles, s.now(), s.quota)
 	if err != nil {
 		s.deleteStoredFiles(ctx, storedFiles)
@@ -109,6 +111,8 @@ func (s *Service) Delete(ctx context.Context, userID int64, id int64) error {
 		return err
 	}
 
+	// Delete the row first so a retry cannot serve this image even if the file
+	// deletion fails and is reported to the caller.
 	if err := s.storage.Delete(ctx, row.FilePath); err != nil {
 		slog.ErrorContext(ctx, "image file deletion failed", slog.Int64("image_id", row.ID), slog.String("file_path", row.FilePath), slog.String("error", err.Error()))
 		return err
@@ -163,6 +167,8 @@ func (s *Service) Cleanup(ctx context.Context, dryRun bool) (CleanupReport, erro
 		if local, ok := s.storage.(*LocalStorage); ok && !local.Exists(row.FilePath) {
 			report.RowsWithoutFiles = append(report.RowsWithoutFiles, row)
 		}
+		// Missing parent entries leave image rows unreachable through normal UI
+		// paths; cleanup removes those rows but never guesses a replacement entry.
 		exists, err := s.repo.ExistsEntry(ctx, row.EntryID)
 		if err != nil {
 			return report, err
@@ -178,6 +184,8 @@ func (s *Service) Cleanup(ctx context.Context, dryRun bool) (CleanupReport, erro
 			return report, err
 		}
 		for _, file := range files {
+			// Only files absent from the DB are deleted automatically. Rows without
+			// files are reported for restore investigation but left untouched.
 			if _, ok := fileRows[filepath.Clean(file)]; !ok {
 				report.FilesWithoutRows = append(report.FilesWithoutRows, file)
 				if !dryRun {

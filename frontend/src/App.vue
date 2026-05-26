@@ -138,6 +138,8 @@ async function prepareDiaryNavigation(source: string) {
     return false;
   }
 
+  // Date changes must flush the editor before loading another entry; otherwise
+  // the store can accept a late autosave for the date the user just left.
   diaryEditor.value?.flushPendingAutosave();
   await store.waitForAutosaveIdle();
   if (hasBlockingSaveStatus(store.saveStatus)) {
@@ -225,6 +227,8 @@ function resolveEntrySurfaceMode(
     return "reader";
   }
 
+  // Today and empty dates open as writable surfaces; historical entries open
+  // read-only until the user explicitly chooses edit.
   if (targetDate === todayISO()) {
     return "editor";
   }

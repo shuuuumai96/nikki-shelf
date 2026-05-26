@@ -109,6 +109,8 @@ func nonNegativeIntEnv(key string, fallback int) int {
 		return fallback
 	}
 
+	// Quota settings are safety limits. Reject malformed explicit values instead
+	// of silently falling back to a weaker default.
 	parsed, err := strconv.Atoi(strings.TrimSpace(value))
 	if err != nil {
 		panic("invalid " + key + ": must be a non-negative integer")
@@ -125,6 +127,8 @@ func nonNegativeInt64Env(key string, fallback int64) int64 {
 		return fallback
 	}
 
+	// Quota settings are safety limits. Reject malformed explicit values instead
+	// of silently falling back to a weaker default.
 	parsed, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64)
 	if err != nil {
 		panic("invalid " + key + ": must be a non-negative integer")

@@ -101,6 +101,8 @@ func (h *Handler) me(c echo.Context) error {
 		return httpx.Error(c, http.StatusUnauthorized, ErrUnauthorized.Error())
 	}
 
+	// /me is the refresh point for the in-memory frontend CSRF token. Rotate the
+	// token here while keeping the session cookie stable.
 	user, err := h.service.UserWithCSRFByToken(c.Request().Context(), token)
 	if err != nil {
 		return authError(c, err)
@@ -149,6 +151,8 @@ func CSRF(service *Service) echo.MiddlewareFunc {
 func csrfWithValidator(validate func(context.Context, string, string) bool) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
+			// Reads are authenticated by the HttpOnly session cookie; mutating
+			// requests also need the per-session CSRF token returned by /auth/me.
 			switch c.Request().Method {
 			case http.MethodGet, http.MethodHead, http.MethodOptions:
 				return next(c)

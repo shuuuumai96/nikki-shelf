@@ -28,6 +28,8 @@ export function currentCSRFToken(): string {
 export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const method = (init?.method || "GET").toUpperCase();
   const headers = new Headers(init?.headers);
+  // Do not set JSON content type for FormData; the browser must add the
+  // multipart boundary or Echo cannot parse uploads.
   if (!(init?.body instanceof FormData) && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }

@@ -53,6 +53,8 @@ func (r *Repository) CreateForUser(ctx context.Context, userID int64, entryID in
 		return nil, err
 	}
 
+	// Locking the entry serializes concurrent uploads for the same diary entry,
+	// so the per-entry image cap and quota checks stay consistent.
 	entryCount, err := countImagesByEntryID(ctx, tx, entryID)
 	if err != nil {
 		return nil, err
@@ -238,6 +240,8 @@ type queryer interface {
 
 func lockEntryForUser(ctx context.Context, tx *sql.Tx, userID int64, entryID int64) error {
 	id := int64(0)
+	// The parent entry is the quota lock target. It also verifies ownership
+	// before any image rows are inserted.
 	err := tx.QueryRowContext(ctx, `SELECT id FROM entries WHERE id = $1 AND user_id = $2 FOR UPDATE`, entryID, userID).Scan(&id)
 	if errors.Is(err, sql.ErrNoRows) {
 		return ErrImageNotFound

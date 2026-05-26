@@ -79,6 +79,13 @@ Before adding CI, review workflow safety:
 - keep permissions minimal
 - avoid workflows that run untrusted pull request code with write tokens or secrets
 
+## GitHub Repository Settings Follow-ups
+
+Before a broader public announcement, repository operators should verify repository settings rather than treating local documentation as proof of configuration:
+
+- enable GitHub private vulnerability reporting so sensitive reports do not need to start in public issues
+- disable GitHub Wiki unless it is intentionally maintained as part of the public documentation surface
+
 ## Optional Future Checks
 
 OpenSSF Scorecard may be useful later as a public repository hygiene check. Treat it as advisory, not as a replacement for project-specific review.

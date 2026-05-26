@@ -104,6 +104,8 @@ export function uploadImage(
   const promise = new Promise<EntryImage>((resolve, reject) => {
     xhr.open("POST", `/api/entries/${entryId}/images`);
     xhr.withCredentials = true;
+    // fetch does not expose upload progress; keep this path on XHR and attach
+    // the same CSRF token that request() adds to mutating fetch calls.
     const token = currentCSRFToken();
     if (token) {
       xhr.setRequestHeader("X-CSRF-Token", token);
