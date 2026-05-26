@@ -195,7 +195,7 @@ See [docs/BACKUP_RESTORE.md](docs/BACKUP_RESTORE.md) for cleanup and repair deta
 
 Nikki can be operated in local, private, or public single-instance environments. Public exposure requires the operator to apply the production configuration, access controls, and backup/restore practices documented in this repository. The README is not a deployment runbook; use the linked operational docs for host-specific steps.
 
-Production Compose uses `.env.production`. Do not commit `.env.production`. For HTTPS production, use secure cookies, exact CORS origins, disabled public signup, and the documented operator-controlled first-user bootstrap flow when applicable. Backend and PostgreSQL ports must not be publicly exposed.
+Production Compose uses `.env.production`. Do not commit `.env.production`. For HTTPS production, use secure cookies, exact CORS origins, disabled public signup, and the documented operator-controlled first-user bootstrap flow when applicable. Backend and PostgreSQL ports must not be publicly exposed. See [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for production-relevant environment variables.
 
 Uploaded images are served from local upload storage in the current single-host design. S3, if used, is for encrypted backup artifacts only, not as the image-serving backend.
 
@@ -209,6 +209,7 @@ Deployment and release documents:
 
 - [docs/DESIGN.md](docs/DESIGN.md)
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- [docs/CONFIGURATION.md](docs/CONFIGURATION.md)
 - [docs/FROZEN_SCOPE.md](docs/FROZEN_SCOPE.md)
 - [docs/ROADMAP.md](docs/ROADMAP.md)
 - [docs/OSS_READINESS.md](docs/OSS_READINESS.md)

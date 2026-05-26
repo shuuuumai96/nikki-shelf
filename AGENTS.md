@@ -11,8 +11,10 @@
 - Frontend install/build: `cd frontend && corepack pnpm install --frozen-lockfile && corepack pnpm build`
 - Frontend format: `cd frontend && corepack pnpm format`
 - Frontend format check: `cd frontend && corepack pnpm format:check`
-- Repository format: `.\scripts\format.ps1`
-- Repository format check: `.\scripts\format-check.ps1`
+- Repository format: `python3 scripts/format.py`
+- Repository format check: `python3 scripts/format.py --check`
+- Repository format on Windows when `python3` is unavailable: `python .\scripts\format.py`
+- Repository format check on Windows when `python3` is unavailable: `python .\scripts\format.py --check`
 - Backend test: `cd backend && go test ./...`
 - Docker build: `docker compose build`
 - Run app: `docker compose up -d`
@@ -25,6 +27,14 @@
 - Keep backend code data-oriented. Avoid large state structs and excessive branching; prefer small functions and maps/strategies where practical.
 - Keep UI simple, calm, document-oriented, and low-clutter.
 - Do not commit generated data, uploads, `node_modules`, or build output.
+- Do not implement items merely because documentation calls them "future", "later", "todo", "candidate", or "roadmap".
+- Future and roadmap items require an explicit task request.
+
+## Mandatory Security Invariants
+
+- Do not remove, bypass, weaken, or "simplify away" authentication, CSRF, authorization, ownership checks, quota checks, request size limits, or upload validation.
+- Any backend route serving diary entries, images, exports, backups, settings, or user-owned data must enforce user ownership at the backend, service, or repository boundary.
+- Legacy compatibility routes such as `/uploads/<name>` must remain owner-checked and must not be converted to unauthenticated static file serving.
 
 ## Local Git Hooks
 

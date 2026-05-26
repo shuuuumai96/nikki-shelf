@@ -11,6 +11,9 @@ This runbook is for the first private AWS EC2 Docker Compose test only. It is no
 - Store uploads in the Docker volume on encrypted EBS-backed storage.
 - Terminate HTTPS on the EC2 host and proxy to the frontend only.
 - Do not expose backend `8080`.
+- Do not serve `/uploads/` directly as static files from Caddy, host nginx, frontend nginx, or any other reverse proxy.
+- Proxy `/uploads/` through the application path that performs metadata lookup and ownership verification.
+- Do not mount the upload volume into a public webroot.
 - Do not add RDS, ECS, App Runner, ALB, NAT Gateway, or S3-backed uploads.
 - Optional S3 use is limited to encrypted backup artifact upload.
 
@@ -105,7 +108,7 @@ Edit `.env.production`:
 nano .env.production
 ```
 
-Required values:
+Required values are shown for the private test. See `docs/CONFIGURATION.md` for the production configuration reference, including purpose, safe defaults, and misconfiguration risks.
 
 ```dotenv
 POSTGRES_DB=nikki
@@ -183,6 +186,8 @@ your-domain.example {
 ```
 
 Do not proxy directly to backend `8080`.
+
+Caddy should proxy only to the frontend container endpoint. Frontend nginx should proxy `/api/` and `/uploads/` to the backend according to `frontend/nginx/default.conf`; do not replace this with public static serving for uploads.
 
 Validate and reload:
 
@@ -393,7 +398,20 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env.
 - Never delete local data before AWS restore is verified.
 - If the test is abandoned, keep enough artifacts to investigate safely, then destroy AWS resources deliberately to stop cost.
 
-## 13. Cost Watch
+## 13. Manual Schema-Change Runbook
+
+Nikki does not yet have versioned migrations. Until that exists, any private-test release that changes `backend/internal/db/schema.sql` or requires production SQL must be handled manually:
+
+1. Back up production data, including PostgreSQL and the matching uploads volume.
+2. Verify the backup with an isolated restore.
+3. Review the SQL manually before applying it.
+4. Apply the SQL in a controlled maintenance window.
+5. Deploy the application.
+6. Verify health, login, entry read/write, image read/write, and backup creation.
+
+Do not add a migration library or migration implementation as part of this runbook.
+
+## 14. Cost Watch
 
 Track these cost drivers:
 
@@ -410,7 +428,7 @@ Track these cost drivers:
 
 Avoid NAT Gateway, ALB, RDS, ECS, and App Runner for this first test unless requirements change.
 
-## 14. Final Go/No-Go Checklist
+## 15. Final Go/No-Go Checklist
 
 The private EC2 test may start only if all items are true:
 
