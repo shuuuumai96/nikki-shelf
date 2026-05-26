@@ -110,7 +110,7 @@ The frontend is built from `frontend/` and served by nginx in the frontend conta
 - Create diary entry: the user creates a date-based entry with title, body, mood, and tags.
 - Edit diary entry: the user edits an existing entry and sends the current entry version.
 - Normal autosave: the frontend saves routine single-tab edits through the entry update API.
-- Conflict detection fallback: stale updates return `409`; the user can reload the server version or preserve local text manually.
+- Conflict detection fallback: stale updates return `409`; the editor keeps a recovery draft that the user can review, copy, or restore after loading the server version.
 - Desktop image attachment: the user attaches supported image files to an entry from a desktop-supported flow.
 - Missing image display: if image metadata exists but the file is missing, the UI surfaces a missing-image state.
 - Backup creation: the application can produce a backup archive through Settings or `GET /api/export/backup`.
@@ -124,7 +124,7 @@ Nikki supports normal single-tab autosave. Each entry has a `version` column. Up
 
 A stale update returns `409` with the `entries.stale_version` error kind. This is a fallback, not robust multi-tab editing. Automatic merge is unsupported.
 
-When a conflict occurs, the user can reload the server version or copy local text before reloading. Users should avoid editing the same entry in multiple tabs.
+When a conflict occurs, the editor captures the local draft before loading the server version. The user can review or copy that draft, load the server version, then optionally restore the local draft into the editor. Users should avoid editing the same entry in multiple tabs.
 
 ## 8. Image Attachment Model
 
