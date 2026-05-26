@@ -140,7 +140,7 @@ The restored entry count must match the source entry count, the restored image c
 
 ## Cleanup and Repair
 
-Use cleanup dry-run before any destructive cleanup:
+Treat destructive cleanup as a maintenance operation. Do not run it while users are actively uploading images, editing entries, restoring data, or deploying a release. Always take a current operational backup first, and always run dry-run before any destructive cleanup:
 
 ```bash
 ./nikki cleanup-images --dry-run
@@ -158,9 +158,20 @@ The destructive command:
 ./nikki cleanup-images
 ```
 
-Deletes orphan files from `filesWithoutRows` and deletes DB rows from `rowsWithMissingEntries`.
+Deletes in this intended order:
 
-It intentionally does not delete `rowsWithoutFiles`. A DB row with a missing file can represent recoverable metadata if the operator still has the missing uploads backup. To repair it:
+1. Delete orphan files reported in `filesWithoutRows`.
+2. Delete DB rows reported in `rowsWithMissingEntries`.
+
+It intentionally does not delete `rowsWithoutFiles`. A DB row with a missing file can represent recoverable metadata if the operator still has the missing uploads backup.
+
+DB rows and filesystem files are not protected by a single distributed transaction. If destructive cleanup partially fails, use the logs to identify which step failed, preserve the current backup, rerun `./nikki cleanup-images --dry-run`, and compare the new report with the pre-cleanup dry-run before taking further action. Expected recovery behavior is:
+
+- If orphan file deletion fails, the database should still retain its existing image metadata; rerun dry-run and delete only the remaining orphan files after correcting the filesystem problem.
+- If DB row deletion fails after orphan files were deleted, rerun dry-run and remove only the remaining `rowsWithMissingEntries` after correcting the database problem.
+- If the operator is unsure which deletions completed, stop and verify from the backup, logs, database counts, and a fresh dry-run before retrying.
+
+To repair `rowsWithoutFiles`:
 
 1. Prefer restoring the missing file from the matching uploads backup.
 2. If the file is permanently lost, inspect the affected row and entry first.

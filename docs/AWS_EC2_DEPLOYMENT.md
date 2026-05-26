@@ -15,6 +15,12 @@ This runbook describes the minimum operator-managed public production shape for 
 - EC2 management through AWS Systems Manager Session Manager. Do not open public SSH.
 - Optional private S3 bucket for encrypted backup copies; uploads are not served from S3.
 
+## Upload Routing Invariant
+
+Do not serve `/uploads/` directly as static files from Caddy, host nginx, frontend nginx, or any other reverse proxy. `/uploads/` must be proxied through the application path that performs metadata lookup and ownership verification.
+
+The upload volume must not be mounted into a public webroot. Caddy should proxy only to the frontend container endpoint, and frontend nginx should proxy `/api/` and `/uploads/` to the backend according to `frontend/nginx/default.conf`.
+
 ## AWS Resources
 
 - EC2 instance: Amazon Linux 2023, encrypted EBS root volume, public IP or Elastic IP, no public SSH access.
@@ -87,14 +93,12 @@ chmod 600 .env.production
 
 Replace every placeholder in `.env.production` before starting the stack. Do not commit `.env.production`.
 
-Production requirements:
+Production requirements are summarized here; see `docs/CONFIGURATION.md` for purpose, safe defaults, and misconfiguration risks for each production-relevant environment variable.
 
-- `POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD` must be real production values.
-- `NIKKI_DATABASE_URL` must use the production PostgreSQL values and `postgres:5432`.
+- Database variables must contain real production values and `NIKKI_DATABASE_URL` must point to `postgres:5432` inside Compose.
 - `NIKKI_COOKIE_SECURE=true` is required for HTTPS production.
 - `NIKKI_CORS_ALLOWED_ORIGINS` must match the exact public HTTPS origin.
-- `NIKKI_SIGNUP_ENABLED=false` is expected for public production.
-- `NIKKI_FIRST_USER_SETUP_ENABLED=false` is expected for public production unless you are intentionally running a trusted first-user browser setup flow.
+- Signup should stay closed for public production except for the documented first-user bootstrap flow.
 - `NIKKI_FIRST_USER_BOOTSTRAP_TOKEN` must be a long random secret before an empty database is exposed publicly.
 - `NIKKI_STRIP_IMAGE_METADATA=true` is expected for production.
 - `.env.production` must not be committed.
@@ -238,7 +242,16 @@ Roll back code by checking out the previous reviewed revision, then rerun config
 
 Nikki currently uses automatic idempotent schema setup from `backend/internal/db/schema.sql` through the backend startup path. There is intentionally no versioned migration framework in this pass.
 
-Future production hardening should add versioned migrations. Until then, every schema-changing release requires a successful backup before deployment and isolated restore verification after backup creation.
+Future production hardening should add versioned migrations. Until then, every schema-changing release requires a manual runbook:
+
+1. Back up production data, including PostgreSQL and the matching uploads volume.
+2. Verify the backup with an isolated restore.
+3. Review the SQL manually before applying it.
+4. Apply the SQL in a controlled maintenance window.
+5. Deploy the application.
+6. Verify health, login, entry read/write, image read/write, and backup creation.
+
+Do not introduce a migration library or migration implementation as part of routine schema-change documentation updates.
 
 ## Healthchecks
 
