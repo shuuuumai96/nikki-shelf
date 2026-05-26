@@ -400,7 +400,9 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env.
 
 ## 13. Manual Schema-Change Runbook
 
-Nikki does not yet have versioned migrations. Until that exists, any private-test release that changes `backend/internal/db/schema.sql` or requires production SQL must be handled manually:
+Versioned migrations are not implemented in this pass. Do not add a migration framework unless an explicit task requests it.
+
+Any private-test release that changes `backend/internal/db/schema.sql` or requires production SQL must be handled manually:
 
 1. Back up production data, including PostgreSQL and the matching uploads volume.
 2. Verify the backup with an isolated restore.
