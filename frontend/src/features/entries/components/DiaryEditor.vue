@@ -66,6 +66,7 @@ const emit = defineEmits<{
 
 type UploadStatus = "preparing" | "uploading" | "failed";
 type EntryChromePanel = "actions" | "shortcuts" | null;
+type RecoveryCopyStatus = "idle" | "copied" | "failed";
 
 type UploadImageItem = {
   id: string;
@@ -81,6 +82,11 @@ type UploadImageItem = {
   active: boolean;
   upload: UploadImageRequest | null;
   insertionPosition: number | null;
+};
+
+type ConflictRecoveryDraft = EntryInput & {
+  baseVersion: number;
+  capturedAt: number;
 };
 
 const form = reactive<EntryInput>({
@@ -112,15 +118,42 @@ const syncingFromProps = ref(false);
 const localDirty = ref(false);
 const activeEntryKey = ref("");
 const baselineInput = ref<EntryInput>(cloneEntryInput(form));
+const conflictRecoveryDraft = ref<ConflictRecoveryDraft | null>(null);
+const recoveryCopyStatus = ref<RecoveryCopyStatus>("idle");
+const recoveryDraftRestored = ref(false);
 const draftStorageKey = computed(() => `nikki:draft:${activeEntryKey.value}`);
 
 const heading = computed(() => formatDateLabel(form.entryDate, locale.value));
 const navigationDisabled = computed(
   () => props.saving || props.saveStatus === "saving",
 );
-const localTextForMerge = computed(() => {
-  const parts = [form.title.trim(), form.body.trim()].filter(Boolean);
-  return parts.join("\n\n");
+const showRecoveryPanel = computed(
+  () => props.saveStatus === "conflict" || conflictRecoveryDraft.value !== null,
+);
+const activeRecoveryDraft = computed<EntryInput | null>(
+  () =>
+    conflictRecoveryDraft.value ||
+    (props.saveStatus === "conflict" ? cloneEntryInput(form) : null),
+);
+const recoveryDraftText = computed(() => {
+  if (!activeRecoveryDraft.value) {
+    return "";
+  }
+  return formatRecoveryDraft(activeRecoveryDraft.value);
+});
+const recoveryHelpText = computed(() =>
+  props.saveStatus === "conflict"
+    ? t("entries.recoveryConflictHelp")
+    : t("entries.recoveryServerLoadedHelp"),
+);
+const recoveryCopyText = computed(() => {
+  if (recoveryCopyStatus.value === "copied") {
+    return t("entries.recoveryCopied");
+  }
+  if (recoveryCopyStatus.value === "failed") {
+    return t("entries.recoveryCopyFailed");
+  }
+  return t("entries.copyRecoveryDraft");
 });
 const imageSlotsLeft = computed(() =>
   Math.max(
@@ -199,6 +232,7 @@ watch(
     }
     if (changedEntry) {
       clearUploadImages();
+      clearConflictRecoveryDraft();
     }
     void nextTick(() => {
       syncingFromProps.value = false;
@@ -210,10 +244,18 @@ watch(
 watch(
   () => props.saveStatus,
   (status) => {
+    if (status === "conflict") {
+      captureConflictRecoveryDraft();
+      return;
+    }
+
     if (status === "saved") {
       baselineInput.value = cloneEntryInput(form);
       localDirty.value = false;
       clearLocalDraft();
+      if (recoveryDraftRestored.value) {
+        clearConflictRecoveryDraft();
+      }
     }
   },
 );
@@ -283,6 +325,8 @@ function navigateNextDay() {
 
 function reloadServerVersion() {
   clearAutosaveTimer();
+  captureConflictRecoveryDraft();
+  localDirty.value = false;
   emit("reloadEntry");
 }
 
@@ -349,12 +393,44 @@ function onDocumentPointerDown(event: PointerEvent) {
   closeEntryChromePanel();
 }
 
-async function copyLocalText() {
-  const text = localTextForMerge.value;
+async function copyRecoveryDraft() {
+  const text = recoveryDraftText.value;
   if (!text) {
     return;
   }
-  await navigator.clipboard?.writeText(text);
+
+  try {
+    await navigator.clipboard.writeText(text);
+    recoveryCopyStatus.value = "copied";
+  } catch {
+    recoveryCopyStatus.value = "failed";
+  }
+}
+
+function restoreRecoveryDraft() {
+  if (!conflictRecoveryDraft.value) {
+    return;
+  }
+
+  const draft = cloneEntryInput(conflictRecoveryDraft.value);
+  clearAutosaveTimer();
+  syncingFromProps.value = true;
+  applyInput(draft);
+  baselineInput.value = cloneEntryInput(entryToInput(props.entry, props.date));
+  localDirty.value = !isSameEntryInput(draft, baselineInput.value);
+  recoveryDraftRestored.value = true;
+  recoveryCopyStatus.value = "idle";
+
+  void nextTick(() => {
+    syncingFromProps.value = false;
+    if (localDirty.value) {
+      scheduleAutosave();
+    }
+  });
+}
+
+function dismissRecoveryDraft() {
+  clearConflictRecoveryDraft();
 }
 
 function scheduleAutosave() {
@@ -374,6 +450,11 @@ function scheduleAutosave() {
 
   localDirty.value = true;
   writeLocalDraft();
+  if (props.saveStatus === "conflict") {
+    captureConflictRecoveryDraft();
+    return;
+  }
+
   autosaveTimer.value = window.setTimeout(() => {
     autosaveTimer.value = null;
     emit("autosave", { ...form, tags: [...form.tags] });
@@ -633,6 +714,22 @@ function writeLocalDraft() {
   );
 }
 
+function captureConflictRecoveryDraft() {
+  conflictRecoveryDraft.value = {
+    ...cloneEntryInput(form),
+    baseVersion: props.entry?.version ?? 0,
+    capturedAt: Date.now(),
+  };
+  recoveryDraftRestored.value = false;
+  recoveryCopyStatus.value = "idle";
+}
+
+function clearConflictRecoveryDraft() {
+  conflictRecoveryDraft.value = null;
+  recoveryCopyStatus.value = "idle";
+  recoveryDraftRestored.value = false;
+}
+
 function readLocalDraft(
   key: string,
   serverVersion: number,
@@ -717,6 +814,36 @@ function sameTags(left: string[], right: string[]) {
 
 function cloneEntryInput(input: EntryInput): EntryInput {
   return { ...input, tags: [...input.tags] };
+}
+
+function formatRecoveryDraft(input: EntryInput) {
+  const title = input.title.trim() || t("entries.recoveryEmpty");
+  const body = input.body.trim() || t("entries.recoveryEmpty");
+  const tags = input.tags.length
+    ? input.tags.join(", ")
+    : t("entries.recoveryEmpty");
+
+  return [
+    `${t("entries.recoveryDate")}: ${input.entryDate}`,
+    `${t("entries.recoveryTitle")}: ${title}`,
+    `${t("entries.recoveryMood")}: ${moodLabel(input.mood)}`,
+    `${t("entries.recoveryTags")}: ${tags}`,
+    "",
+    `${t("entries.recoveryBody")}:`,
+    body,
+  ].join("\n");
+}
+
+function moodLabel(mood: MoodKey) {
+  const labels: Record<MoodKey, string> = {
+    happy: t("entries.moodHappy"),
+    calm: t("entries.moodCalm"),
+    tired: t("entries.moodTired"),
+    sad: t("entries.moodSad"),
+    excited: t("entries.moodExcited"),
+  };
+
+  return labels[mood];
 }
 
 function isMobileViewport() {
@@ -933,21 +1060,49 @@ function errorMessage(error: unknown) {
         {{ navigationMessage }}
       </p>
       <div
-        v-if="saveStatus === 'conflict'"
+        v-if="showRecoveryPanel"
         class="recovery-panel"
+        :class="{ 'recovery-panel--retained': saveStatus !== 'conflict' }"
         aria-live="polite"
       >
-        <p>{{ saveError }}</p>
-        <div>
-          <button type="button" @click="reloadServerVersion">
+        <div class="recovery-panel__copy">
+          <strong>{{ t("entries.recoveryDraftHeading") }}</strong>
+          <p v-if="saveStatus === 'conflict' && saveError">{{ saveError }}</p>
+          <p>{{ recoveryHelpText }}</p>
+        </div>
+        <label class="sr-only" for="entry-recovery-draft">
+          {{ t("entries.recoveryDraftLabel") }}
+        </label>
+        <textarea
+          id="entry-recovery-draft"
+          class="recovery-panel__draft"
+          readonly
+          :value="recoveryDraftText"
+        ></textarea>
+        <div class="recovery-panel__actions">
+          <button
+            v-if="saveStatus === 'conflict'"
+            type="button"
+            @click="reloadServerVersion"
+          >
             {{ t("entries.loadServerVersion") }}
+          </button>
+          <button v-else type="button" @click="restoreRecoveryDraft">
+            {{ t("entries.restoreRecoveryDraft") }}
           </button>
           <button
             type="button"
-            :disabled="!localTextForMerge"
-            @click="copyLocalText"
+            :disabled="!recoveryDraftText"
+            @click="copyRecoveryDraft"
           >
-            {{ t("entries.copyLocalBody") }}
+            {{ recoveryCopyText }}
+          </button>
+          <button
+            v-if="saveStatus !== 'conflict'"
+            type="button"
+            @click="dismissRecoveryDraft"
+          >
+            {{ t("entries.dismissRecoveryDraft") }}
           </button>
         </div>
       </div>
@@ -1490,14 +1645,54 @@ function errorMessage(error: unknown) {
   line-height: 1.6;
 }
 
-.recovery-panel p {
-  margin: 0 0 8px;
+.recovery-panel--retained {
+  border-color: var(--border-subtle);
+  background: var(--color-surface);
+  color: var(--color-text-soft);
 }
 
-.recovery-panel div {
+.recovery-panel__copy {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.recovery-panel__copy strong {
+  color: var(--color-text);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.recovery-panel__copy p {
+  margin: 0;
+}
+
+.recovery-panel__draft {
+  display: block;
+  width: 100%;
+  min-height: 128px;
+  resize: vertical;
+  border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-surface) 84%, transparent);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.55;
+  padding: 8px 9px;
+  white-space: pre-wrap;
+}
+
+.recovery-panel__draft:focus {
+  outline: 2px solid color-mix(in srgb, var(--color-accent) 55%, transparent);
+  outline-offset: 2px;
+}
+
+.recovery-panel__actions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  margin-top: 8px;
 }
 
 .recovery-panel button {
