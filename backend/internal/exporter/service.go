@@ -22,8 +22,8 @@ const (
 )
 
 var (
-	ErrUnsupportedFormat = errors.New("エクスポート形式を確認してください")
-	ErrExportTooLarge    = errors.New("エクスポート対象が多すぎます")
+	ErrUnsupportedFormat = errors.New("check the export format")
+	ErrExportTooLarge    = errors.New("too many items to export")
 )
 
 type EntryService interface {

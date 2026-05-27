@@ -44,7 +44,7 @@ func (h *Handler) upload(c echo.Context) error {
 
 	entryID, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
-		return httpx.ErrorWithKind(c, http.StatusBadRequest, "IDを確認してください", "request.invalid_id")
+		return httpx.ErrorWithKind(c, http.StatusBadRequest, "check the ID", "request.invalid_id")
 	}
 
 	request := c.Request()
@@ -85,7 +85,7 @@ func (h *Handler) delete(c echo.Context) error {
 
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
-		return httpx.ErrorWithKind(c, http.StatusBadRequest, "IDを確認してください", "request.invalid_id")
+		return httpx.ErrorWithKind(c, http.StatusBadRequest, "check the ID", "request.invalid_id")
 	}
 
 	if err := h.service.Delete(c.Request().Context(), userID, id); err != nil {
@@ -104,7 +104,7 @@ func (h *Handler) content(c echo.Context) error {
 
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil || id < 1 {
-		return httpx.ErrorWithKind(c, http.StatusBadRequest, "IDを確認してください", "images.invalid_image_id")
+		return httpx.ErrorWithKind(c, http.StatusBadRequest, "check the image ID", "images.invalid_image_id")
 	}
 
 	row, err := h.service.Content(c.Request().Context(), userID, id)

@@ -204,6 +204,46 @@ export default {
   errors: {
     api: "APIエラーが発生しました",
     generic: "エラーが発生しました",
-    invalidDate: "Enter a valid date.",
+    invalidDate: "有効な日付を入力してください。",
+    backend: {
+      request: {
+        too_large: "リクエストが大きすぎます。",
+        invalid_json: "リクエストJSONを確認してください。",
+        invalid_id: "IDを確認してください。",
+      },
+      auth: {
+        invalid_input: "ユーザー名とパスワードを確認してください。",
+        invalid_credentials: "ユーザー名またはパスワードを確認してください。",
+        unauthorized: "ログインしてください。",
+        signup_closed: "サインアップは現在停止されています。",
+        username_exists: "このユーザー名はすでに使われています。",
+        csrf: "リクエストを確認して、もう一度試してください。",
+        rate_limited:
+          "認証リクエストが多すぎます。時間をおいて再試行してください。",
+      },
+      entries: {
+        invalid_cursor: "ページ指定を確認してください。",
+        invalid_input: "日記の入力内容を確認してください。",
+        not_found: "日記が見つかりません。",
+        date_exists: "その日の日記はすでにあります。",
+        stale_version: "日記が別の画面で更新されています。",
+      },
+      images: {
+        invalid_image: "画像ファイルを確認してください。",
+        too_large: "画像は8MB以下にしてください。",
+        quota_exceeded: "画像の保存容量を超えています。",
+        too_many: "画像は1つの日記につき3枚までです。",
+        not_found: "画像が見つかりません。",
+        invalid_image_id: "画像IDを確認してください。",
+      },
+      export: {
+        unsupported_format: "エクスポート形式を確認してください。",
+        too_large: "エクスポート対象が多すぎます。",
+      },
+      server: {
+        internal: "サーバーで問題が発生しました。",
+        panic: "サーバーで問題が発生しました。",
+      },
+    },
   },
 };

@@ -25,7 +25,7 @@ const (
 	userIDKey    = "log.user_id"
 )
 
-const internalMessage = "サーバーで問題が発生しました"
+const internalMessage = "something went wrong on the server"
 
 type Config struct {
 	Level  string
@@ -130,7 +130,10 @@ func Recover(logger *slog.Logger) echo.MiddlewareFunc {
 				)
 
 				if !c.Response().Committed {
-					_ = c.JSON(http.StatusInternalServerError, map[string]string{"error": internalMessage})
+					_ = c.JSON(http.StatusInternalServerError, map[string]string{
+						"error": internalMessage,
+						"kind":  "server.panic",
+					})
 				}
 				// Echo's outer error handler has already been bypassed by the
 				// recovered panic; returning nil prevents a duplicate response.

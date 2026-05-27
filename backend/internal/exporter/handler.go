@@ -62,7 +62,7 @@ func (h *Handler) exportEntryMarkdown(c echo.Context) error {
 
 	entryID, err := strconv.ParseInt(c.Param("entryId"), 10, 64)
 	if err != nil {
-		return httpx.ErrorWithKind(c, http.StatusBadRequest, "IDを確認してください", "request.invalid_id")
+		return httpx.ErrorWithKind(c, http.StatusBadRequest, "check the ID", "request.invalid_id")
 	}
 
 	content, exporter, entry, err := h.service.ExportEntryMarkdown(c.Request().Context(), userID, entryID)

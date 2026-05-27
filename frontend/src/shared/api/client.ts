@@ -25,6 +25,17 @@ export function currentCSRFToken(): string {
   return csrfToken;
 }
 
+export function localizedErrorMessage(error: unknown): string {
+  if (error instanceof ApiError) {
+    const message = localizedBackendError(error.kind);
+    return message || error.message || i18n.global.t("errors.api");
+  }
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return i18n.global.t("errors.generic");
+}
+
 export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const method = (init?.method || "GET").toUpperCase();
   const headers = new Headers(init?.headers);
@@ -69,4 +80,13 @@ async function readError(
   } catch {
     return { message: text || i18n.global.t("errors.api"), kind: "" };
   }
+}
+
+function localizedBackendError(kind: string): string {
+  if (!kind) {
+    return "";
+  }
+
+  const key = `errors.backend.${kind}`;
+  return i18n.global.te(key) ? i18n.global.t(key) : "";
 }
