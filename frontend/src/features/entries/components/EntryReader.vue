@@ -90,11 +90,14 @@ function onKeydown(event: KeyboardEvent) {
         <button
           type="button"
           class="entry-surface__chrome-action"
+          :aria-label="t('common.previousDay')"
           :disabled="isNavigating"
           @click="navigatePreviousDay"
         >
           <span aria-hidden="true">‹</span>
-          <span>{{ t("common.previousDay") }}</span>
+          <span class="entry-surface__nav-label">{{
+            t("common.previousDay")
+          }}</span>
         </button>
         <h1 class="ui-heading entry-surface__date">
           <span>{{ heading }}</span>
@@ -102,10 +105,13 @@ function onKeydown(event: KeyboardEvent) {
         <button
           type="button"
           class="entry-surface__chrome-action"
+          :aria-label="t('common.nextDay')"
           :disabled="isNavigating"
           @click="navigateNextDay"
         >
-          <span>{{ t("common.nextDay") }}</span>
+          <span class="entry-surface__nav-label">{{
+            t("common.nextDay")
+          }}</span>
           <span aria-hidden="true">›</span>
         </button>
       </div>
@@ -438,29 +444,76 @@ function onKeydown(event: KeyboardEvent) {
 @media (max-width: 480px) {
   .entry-surface {
     padding-top: 22px;
-    padding-bottom: calc(154px + env(safe-area-inset-bottom));
+    padding-bottom: calc(112px + env(safe-area-inset-bottom));
   }
 
   .entry-surface__chrome {
+    align-items: start;
     gap: 10px;
-    margin-bottom: 22px;
+    margin-bottom: 18px;
   }
 
   .entry-surface__date-nav {
-    flex-wrap: wrap;
-    gap: 8px;
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr) 40px;
+    width: 100%;
+    gap: 6px;
   }
 
   .entry-surface__date {
+    align-self: center;
     font-size: 16px;
+    text-align: center;
+  }
+
+  .entry-surface__chrome-action {
+    min-height: 40px;
+    justify-content: center;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+    padding: 0;
+    font-size: 18px;
+    text-decoration: none;
+  }
+
+  .entry-surface__chrome-action:hover:not(:disabled) {
+    text-decoration: none;
+  }
+
+  .entry-surface__nav-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
   }
 
   .entry-surface__edit {
     align-self: start;
+    min-width: 48px;
+    padding: 0 10px;
+    font-size: 13px;
+  }
+
+  .entry-actions__trigger {
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--border-subtle);
+    background: var(--color-surface);
   }
 
   .entry-surface__title {
     font-size: 22px;
+  }
+
+  .entry-surface__meta {
+    min-height: 0;
+    margin-bottom: 18px;
   }
 }
 </style>

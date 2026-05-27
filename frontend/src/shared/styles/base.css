@@ -181,6 +181,12 @@ img {
 }
 
 @media (max-width: 480px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+
   .entry-markdown-body {
     font-size: 16px;
     line-height: 1.78;

@@ -117,11 +117,14 @@ input::placeholder {
 @media (max-width: 480px) {
   .tag-input {
     min-height: 44px;
-    padding: 7px 8px;
+    gap: 8px;
+    border-radius: var(--radius-sm);
+    padding: 7px 10px;
   }
 
   .tag {
     min-height: 30px;
+    padding: 0 9px;
   }
 
   .tag button {
@@ -131,6 +134,7 @@ input::placeholder {
 
   input {
     min-height: 30px;
+    font-size: 16px;
   }
 }
 </style>

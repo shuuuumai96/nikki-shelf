@@ -45,4 +45,12 @@ const { currentLocale, localeOptions, setLocale } = useLocaleSwitcher();
   color: var(--color-text);
   outline: 0;
 }
+
+@media (max-width: 480px) {
+  .language-select select {
+    min-height: 38px;
+    padding: 0 10px;
+    font-size: 16px;
+  }
+}
 </style>
