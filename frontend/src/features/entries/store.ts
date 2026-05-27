@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import { ApiError } from "../../shared/api/client";
+import { ApiError, localizedErrorMessage } from "../../shared/api/client";
 import { i18n } from "../../shared/i18n";
 import { todayISO } from "../../shared/utils/date";
 import {
@@ -454,10 +454,7 @@ function cloneInput(input: EntryInput): EntryInput {
 }
 
 function errorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return i18n.global.t("errors.generic");
+  return localizedErrorMessage(error);
 }
 
 function isConflict(error: unknown): boolean {

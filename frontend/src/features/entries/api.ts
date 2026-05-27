@@ -145,7 +145,8 @@ export function uploadImage(
         return;
       }
 
-      reject(new ApiError(xhr.status, readXHRError(xhr)));
+      const error = readXHRError(xhr);
+      reject(new ApiError(xhr.status, error.message, error.kind));
     };
 
     xhr.onerror = () =>
@@ -173,11 +174,20 @@ export function listTags(): Promise<string[]> {
   return request<string[]>("/api/tags");
 }
 
-function readXHRError(xhr: XMLHttpRequest): string {
+function readXHRError(xhr: XMLHttpRequest): { message: string; kind: string } {
   try {
-    const data = JSON.parse(xhr.responseText || "{}") as { error?: string };
-    return data.error || i18n.global.t("images.fallbackUploadFailed");
+    const data = JSON.parse(xhr.responseText || "{}") as {
+      error?: string;
+      kind?: string;
+    };
+    return {
+      message: data.error || i18n.global.t("images.fallbackUploadFailed"),
+      kind: data.kind || "",
+    };
   } catch {
-    return xhr.responseText || i18n.global.t("images.fallbackUploadFailed");
+    return {
+      message: xhr.responseText || i18n.global.t("images.fallbackUploadFailed"),
+      kind: "",
+    };
   }
 }

@@ -3,9 +3,9 @@ package auth
 import "errors"
 
 var (
-	ErrInvalidCredentials = errors.New("ユーザー名またはパスワードを確認してください")
-	ErrInvalidInput       = errors.New("入力内容を確認してください")
-	ErrSignupClosed       = errors.New("サインアップは現在停止されています")
-	ErrUsernameExists     = errors.New("このユーザー名はすでに使われています")
-	ErrUnauthorized       = errors.New("ログインしてください")
+	ErrInvalidCredentials = errors.New("check the username or password")
+	ErrInvalidInput       = errors.New("check the input")
+	ErrSignupClosed       = errors.New("signup is currently disabled")
+	ErrUsernameExists     = errors.New("this username is already in use")
+	ErrUnauthorized       = errors.New("log in to continue")
 )

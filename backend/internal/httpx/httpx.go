@@ -76,5 +76,5 @@ func ErrorWithKind(c echo.Context, status int, message string, kind string) erro
 
 func Internal(c echo.Context, err error) error {
 	logx.SetError(c, "server.internal", err)
-	return Error(c, http.StatusInternalServerError, "サーバーで問題が発生しました")
+	return ErrorWithKind(c, http.StatusInternalServerError, "something went wrong on the server", "server.internal")
 }

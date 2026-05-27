@@ -17,6 +17,7 @@ import {
   watch,
 } from "vue";
 import { useI18n } from "vue-i18n";
+import { localizedErrorMessage } from "../../../shared/api/client";
 import IconButton from "../../../shared/components/IconButton.vue";
 import {
   formatDateLabel,
@@ -872,10 +873,7 @@ function revokeObjectUrl(item: UploadImageItem) {
 }
 
 function errorMessage(error: unknown) {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return t("images.fallbackUploadFailed");
+  return localizedErrorMessage(error);
 }
 </script>
 

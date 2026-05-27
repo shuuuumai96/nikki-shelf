@@ -2,9 +2,9 @@ import { defineStore } from "pinia";
 import {
   ApiError,
   clearCSRFToken,
+  localizedErrorMessage,
   setCSRFToken,
 } from "../../shared/api/client";
-import { i18n } from "../../shared/i18n";
 import { login, logout, me, signup } from "./api";
 import type { AuthCredentials, AuthUser } from "./types";
 
@@ -74,10 +74,7 @@ export const useAuthStore = defineStore("auth", {
 });
 
 function errorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return i18n.global.t("errors.generic");
+  return localizedErrorMessage(error);
 }
 
 function rememberCSRF(user: AuthUser | null) {

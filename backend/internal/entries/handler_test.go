@@ -333,7 +333,7 @@ func TestHandlerGetEntryInvalidID(t *testing.T) {
 	server.ServeHTTP(response, request)
 
 	assertStatus(t, response, http.StatusBadRequest)
-	assertError(t, response, "IDを確認してください")
+	assertError(t, response, "check the ID")
 }
 
 func TestHandlerGetEntryNotFound(t *testing.T) {

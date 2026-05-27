@@ -171,5 +171,5 @@ func accountKey(username string) string {
 }
 
 func rateLimitError(c echo.Context) error {
-	return httpx.ErrorWithKind(c, http.StatusTooManyRequests, "認証リクエストが多すぎます", "auth.rate_limited")
+	return httpx.ErrorWithKind(c, http.StatusTooManyRequests, "too many authentication requests", "auth.rate_limited")
 }

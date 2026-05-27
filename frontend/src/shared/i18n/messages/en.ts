@@ -207,5 +207,44 @@ export default {
     api: "An API error occurred.",
     generic: "An error occurred.",
     invalidDate: "Enter a valid date.",
+    backend: {
+      request: {
+        too_large: "The request is too large.",
+        invalid_json: "Check the request JSON.",
+        invalid_id: "Check the ID.",
+      },
+      auth: {
+        invalid_input: "Check the username and password.",
+        invalid_credentials: "Check the username or password.",
+        unauthorized: "Log in to continue.",
+        signup_closed: "Sign up is currently disabled.",
+        username_exists: "This username is already in use.",
+        csrf: "Check the request and try again.",
+        rate_limited: "Too many authentication requests. Try again later.",
+      },
+      entries: {
+        invalid_cursor: "Check the page cursor.",
+        invalid_input: "Check the diary input.",
+        not_found: "Entry not found.",
+        date_exists: "An entry already exists for that day.",
+        stale_version: "The entry was updated in another session.",
+      },
+      images: {
+        invalid_image: "Check the image file.",
+        too_large: "Images must be 8 MB or smaller.",
+        quota_exceeded: "Image storage quota exceeded.",
+        too_many: "Each entry can have up to 3 images.",
+        not_found: "Image not found.",
+        invalid_image_id: "Check the image ID.",
+      },
+      export: {
+        unsupported_format: "Check the export format.",
+        too_large: "Too many items to export.",
+      },
+      server: {
+        internal: "Something went wrong on the server.",
+        panic: "Something went wrong on the server.",
+      },
+    },
   },
 };

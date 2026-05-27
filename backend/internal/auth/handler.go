@@ -69,9 +69,9 @@ func (h *Handler) start(c echo.Context, event string, start func(context.Context
 	input := Credentials{}
 	if err := httpx.DecodeJSONWithLimit(c, &input, httpx.AuthJSONLimitBytes); err != nil {
 		if errors.Is(err, httpx.ErrRequestTooLarge) {
-			return httpx.ErrorWithKind(c, http.StatusRequestEntityTooLarge, "JSONが大きすぎます", "request.too_large")
+			return httpx.ErrorWithKind(c, http.StatusRequestEntityTooLarge, "request JSON is too large", "request.too_large")
 		}
-		return httpx.ErrorWithKind(c, http.StatusBadRequest, "JSONを確認してください", "request.invalid_json")
+		return httpx.ErrorWithKind(c, http.StatusBadRequest, "check the request JSON", "request.invalid_json")
 	}
 
 	if h.rateLimiter != nil && !h.rateLimiter.Allow(c, input.Username) {
@@ -98,7 +98,7 @@ func (h *Handler) start(c echo.Context, event string, start func(context.Context
 func (h *Handler) me(c echo.Context) error {
 	token, err := sessionToken(c)
 	if err != nil {
-		return httpx.Error(c, http.StatusUnauthorized, ErrUnauthorized.Error())
+		return httpx.ErrorWithKind(c, http.StatusUnauthorized, ErrUnauthorized.Error(), "auth.unauthorized")
 	}
 
 	// /me is the refresh point for the in-memory frontend CSRF token. Rotate the
@@ -160,7 +160,7 @@ func csrfWithValidator(validate func(context.Context, string, string) bool) echo
 
 			token, err := sessionToken(c)
 			if err != nil || !validate(c.Request().Context(), token, c.Request().Header.Get("X-CSRF-Token")) {
-				return httpx.ErrorWithKind(c, http.StatusForbidden, "リクエストを確認してください", "auth.csrf")
+				return httpx.ErrorWithKind(c, http.StatusForbidden, "check the request", "auth.csrf")
 			}
 			return next(c)
 		}

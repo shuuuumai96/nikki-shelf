@@ -279,16 +279,16 @@ func unauthorized(c echo.Context) error {
 }
 
 func badID(c echo.Context) error {
-	return httpx.ErrorWithKind(c, http.StatusBadRequest, "IDを確認してください", "request.invalid_id")
+	return httpx.ErrorWithKind(c, http.StatusBadRequest, "check the ID", "request.invalid_id")
 }
 
 func badJSON(c echo.Context) error {
-	return httpx.ErrorWithKind(c, http.StatusBadRequest, "JSONを確認してください", "request.invalid_json")
+	return httpx.ErrorWithKind(c, http.StatusBadRequest, "check the request JSON", "request.invalid_json")
 }
 
 func entryJSONError(c echo.Context, err error) error {
 	if errors.Is(err, httpx.ErrRequestTooLarge) {
-		return httpx.ErrorWithKind(c, http.StatusRequestEntityTooLarge, "JSONが大きすぎます", "request.too_large")
+		return httpx.ErrorWithKind(c, http.StatusRequestEntityTooLarge, "request JSON is too large", "request.too_large")
 	}
 	return badJSON(c)
 }
