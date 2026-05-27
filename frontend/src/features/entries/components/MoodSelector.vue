@@ -22,6 +22,7 @@ const { t } = useI18n();
       class="mood"
       :class="{ active: modelValue === key }"
       :style="{ '--mood-color': moodSpecs[key].color }"
+      :aria-label="t(moodSpecs[key].labelKey)"
       type="button"
       @click="emit('update:modelValue', key)"
     >
@@ -76,15 +77,28 @@ const { t } = useI18n();
 @media (max-width: 480px) {
   .moods {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 6px;
   }
 
   .mood {
+    position: relative;
     min-width: 0;
-    min-height: 42px;
+    min-height: 40px;
     justify-content: center;
-    padding: 0 8px;
+    padding: 0;
+  }
+
+  .mood span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
   }
 }
 </style>

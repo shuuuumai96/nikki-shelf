@@ -282,10 +282,12 @@ function isNavItemActive(key: string) {
     height: auto;
     border-top: 1px solid var(--border-control);
     border-bottom: 0;
-    background: var(--color-sidebar);
+    background: color-mix(in srgb, var(--color-sidebar) 96%, transparent);
+    box-shadow: 0 -10px 24px rgba(20, 20, 20, 0.08);
     padding: 7px max(12px, env(safe-area-inset-right))
       calc(8px + env(safe-area-inset-bottom))
       max(12px, env(safe-area-inset-left));
+    backdrop-filter: blur(12px);
   }
 
   .brand {
@@ -299,7 +301,7 @@ function isNavItemActive(key: string) {
   }
 
   .nav-item {
-    min-height: 50px;
+    min-height: 52px;
     grid-template-columns: 1fr;
     justify-items: center;
     gap: 3px;

@@ -442,5 +442,9 @@ input:focus {
   .auth-submit {
     min-height: 48px;
   }
+
+  input {
+    font-size: 16px;
+  }
 }
 </style>

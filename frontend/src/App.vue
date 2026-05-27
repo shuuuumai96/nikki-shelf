@@ -743,8 +743,9 @@ main {
   }
 
   main {
-    height: 100dvh;
-    padding-bottom: calc(64px + env(safe-area-inset-bottom));
+    height: 100svh;
+    padding-bottom: calc(72px + env(safe-area-inset-bottom));
+    -webkit-overflow-scrolling: touch;
   }
 
   .loading-sidebar {
@@ -770,9 +771,13 @@ main {
 }
 
 @media (max-width: 480px) {
+  main {
+    padding-bottom: calc(76px + env(safe-area-inset-bottom));
+  }
+
   .loading-editor {
     padding-top: 32px;
-    padding-bottom: calc(154px + env(safe-area-inset-bottom));
+    padding-bottom: calc(112px + env(safe-area-inset-bottom));
   }
 
   .loading-editor-header {
