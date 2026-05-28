@@ -98,21 +98,20 @@ Production requirements are summarized here; see `docs/CONFIGURATION.md` for pur
 - Database variables must contain real production values and `NIKKI_DATABASE_URL` must point to `postgres:5432` inside Compose.
 - `NIKKI_COOKIE_SECURE=true` is required for HTTPS production.
 - `NIKKI_CORS_ALLOWED_ORIGINS` must match the exact public HTTPS origin.
-- Signup should stay closed for public production except for the documented first-user bootstrap flow.
+- Signup should stay closed for public production. First setup is a separate token-gated empty-database flow for owner creation or operational backup restore.
 - `NIKKI_FIRST_USER_BOOTSTRAP_TOKEN` must be a long random secret before an empty database is exposed publicly.
 - `NIKKI_STRIP_IMAGE_METADATA=true` is expected for production.
 - `.env.production` must not be committed.
 
-`NIKKI_SIGNUP_ENABLED=false` does not allow unsafe unauthenticated first signup. When the database is empty, first signup requires either the `X-Nikki-Bootstrap-Token` request header to match `NIKKI_FIRST_USER_BOOTSTRAP_TOKEN`, or `NIKKI_FIRST_USER_SETUP_ENABLED=true` for an explicitly trusted browser setup flow. After a user exists, first-user setup closes automatically, and keeping `NIKKI_SIGNUP_ENABLED=false` closes additional signup unless the operator explicitly changes this setting.
+`NIKKI_SIGNUP_ENABLED=false` does not allow unsafe unauthenticated first signup. When the database is empty, `/setup` is available in the browser, but owner creation and operational backup restore both require the setup token to match `NIKKI_FIRST_USER_BOOTSTRAP_TOKEN`. `NIKKI_FIRST_USER_SETUP_ENABLED` should remain `false` in public production and does not remove the token requirement. After a user exists or restore succeeds, setup execution is rejected and keeping `NIKKI_SIGNUP_ENABLED=false` closes additional signup unless the operator explicitly changes this setting.
 
-The bootstrap token should be long, random, secret, and never pasted into tickets, chat logs, screenshots, or application logs. If you test first signup with curl, use your real token only in your private shell:
+The bootstrap token should be long, random, secret, and never pasted into tickets, chat logs, screenshots, or application logs. Operational backup archives are also sensitive because they contain private diary data and password hashes. If possible, complete first setup while access is still restricted by Security Group, VPN, SSM port forwarding, Tailscale, or another operator-only path. If you test setup with curl, use your real token only in your private shell:
 
 ```sh
 curl -i \
   -H 'Content-Type: application/json' \
-  -H 'X-Nikki-Bootstrap-Token: replace-with-long-random-bootstrap-token' \
-  -d '{"username":"owner","password":"replace-with-a-long-password"}' \
-  https://diary.example.com/api/auth/signup
+  -d '{"setupToken":"replace-with-long-random-bootstrap-token","username":"owner","password":"replace-with-a-long-password"}' \
+  https://diary.example.com/api/setup/owner
 ```
 
 The token and password in this example are placeholders.
@@ -150,28 +149,35 @@ The backend `8080` port must not be reachable from the internet, and PostgreSQL 
 
 ## Smoke Tests
 
-First signup succeeds using the bootstrap-token flow. On an empty production database, verify the negative case first:
+First setup succeeds using the token-gated setup flow. On an empty production database, verify setup status first:
+
+```bash
+curl -fsS https://your-real-domain.example/api/setup/status
+```
+
+Expected result: JSON with `needsSetup: true`, `canCreateOwner: true`, `canRestoreBackup: true`, and `requiresSetupToken: true`. The response must not reveal whether the configured token is present or correct.
+
+Then verify the negative case:
 
 ```bash
 curl -i \
   -H 'Content-Type: application/json' \
   -d '{"username":"owner","password":"replace-with-a-long-password"}' \
-  https://your-real-domain.example/api/auth/signup
+  https://your-real-domain.example/api/setup/owner
 ```
 
 Expected result: `403`.
 
-Then create the owner user with the bootstrap-token flow:
+Then create the owner user through `/setup` in the browser, restore a valid Nikki operational backup archive through `/setup`, or use the setup owner API:
 
 ```bash
 curl -i \
   -H 'Content-Type: application/json' \
-  -H 'X-Nikki-Bootstrap-Token: replace-with-long-random-bootstrap-token' \
-  -d '{"username":"owner","password":"replace-with-a-long-password"}' \
-  https://your-real-domain.example/api/auth/signup
+  -d '{"setupToken":"replace-with-long-random-bootstrap-token","username":"owner","password":"replace-with-a-long-password"}' \
+  https://your-real-domain.example/api/setup/owner
 ```
 
-Expected result: `200`, a session cookie, and creation of the owner user. The token and password in this example are placeholders only. Do not paste real tokens, passwords, cookies, screenshots containing them, or shared shell logs into tickets or chat.
+Expected result for owner creation: `200`, a session cookie, and creation of the owner user. Expected result for restore: verified archive, restored entries/images, setup lock, and return to login. A second call to `/api/setup/owner` or `/api/setup/restore` after this must return `409`. The token and password in this example are placeholders only. Do not paste real tokens, passwords, cookies, operational backup archives, screenshots containing them, or shared shell logs into tickets or chat.
 
 From a browser at the public HTTPS origin after the owner user exists:
 
@@ -198,7 +204,7 @@ Nikki data lives in both PostgreSQL and the uploads volume. Back up both from th
 ENV_FILE=.env.production ./scripts/backup-production.sh
 ```
 
-The backup artifacts must include a PostgreSQL dump, uploads archive, manifest, and checksums. Keep the artifacts together because diary text and uploads must be restored as one set.
+The backup artifact must be a `nikki-operational-backup-YYYYmmdd-HHMMSS.tar.gz` archive containing `manifest.json`, `db/postgres.dump`, `uploads/uploads.tar`, and checksums when checksum tooling is available. Keep it intact because diary text and uploads must be restored as one set.
 
 Set `AGE_RECIPIENT` to create encrypted `.age` copies:
 
@@ -209,7 +215,7 @@ AGE_RECIPIENT=age1... ENV_FILE=.env.production ./scripts/backup-production.sh
 If S3 is used, upload only encrypted artifacts unless plaintext upload is deliberately accepted for a private bucket:
 
 ```bash
-BACKUP_DIR=backups/nikki-backup-YYYYmmddTHHMMSSZ \
+BACKUP_DIR=backups/<timestamp> \
   S3_BUCKET=your-private-backup-bucket \
   S3_PREFIX=nikki \
   AWS_REGION=ap-northeast-1 \

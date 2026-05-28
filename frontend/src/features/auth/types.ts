@@ -1,6 +1,7 @@
 export type AuthUser = {
   id: number;
   username: string;
+  role: "owner" | "user";
   csrfToken?: string;
 };
 

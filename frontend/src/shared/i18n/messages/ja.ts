@@ -43,6 +43,43 @@ export default {
     signupNote: "サインアップは設定で有効な場合のみ利用できます。",
     setupNote: "作成後、初回セットアップ用のサインアップは自動的に閉じます。",
   },
+  setup: {
+    panelLabel: "初期セットアップ",
+    heading: "Nikkiへようこそ",
+    lead: "このNikkiインスタンスはまだ初期化されていません。最初のownerアカウントを作成するか、運用バックアップから復元できます。",
+    publicWarning:
+      "このインスタンスを公開URLで開いている場合、管理者本人以外は操作しないでください。",
+    tokenHelp:
+      "セットアップトークンは、Nikki起動前に管理者が設定したNIKKI_FIRST_USER_BOOTSTRAP_TOKENの値です。",
+    token: "セットアップトークン",
+    startFreshTitle: "新しく始める",
+    startFreshBody: "空のNikkiに最初のownerアカウントを作成します。",
+    restoreTitle: "バックアップから復元する",
+    restoreBody:
+      "Nikki operational backup archiveをアップロードします。content backup zipはここでは使えません。",
+    backupFile: "バックアップファイル",
+    backupFilePlaceholder: "ファイル未選択",
+    chooseBackupFile: "ファイルを選択",
+    verifyBackup: "バックアップを検証",
+    restoreBackup: "復元",
+    restoreVerified: "バックアップを検証しました",
+    backupCreatedAt: "作成日時",
+    nikkiVersion: "Nikkiバージョン",
+    schemaVersion: "スキーマバージョン",
+    entryCount: "日記",
+    imageCount: "画像",
+    backupSize: "バックアップサイズ",
+    restoreConfirm:
+      "この操作は空のNikkiインスタンスにバックアップ内容を復元します。復元後、この初期セットアップ画面は閉じられます。",
+    restoreMissingInput:
+      "セットアップトークンを入力し、バックアップファイルを選択してください。",
+    restoreVerifyFirst: "復元前にバックアップを検証してください。",
+    restoreConfirmRequired: "復元確認にチェックしてください。",
+    passwordConfirmation: "パスワード確認",
+    createOwner: "ownerアカウントを作成",
+    passwordMismatch: "パスワード確認が一致しません。",
+    locked: "セットアップは完了済みです。",
+  },
   nav: {
     main: "メイン",
     today: "今日",
@@ -220,6 +257,16 @@ export default {
         csrf: "リクエストを確認して、もう一度試してください。",
         rate_limited:
           "認証リクエストが多すぎます。時間をおいて再試行してください。",
+      },
+      setup: {
+        invalid_input: "セットアップフォームを確認してください。",
+        invalid_token: "セットアップトークンを確認してください。",
+        invalid_backup: "バックアップアーカイブを確認してください。",
+        already_initialized: "セットアップは完了済みです。",
+        restore_failed:
+          "復元に失敗しました。バックアップを確認してもう一度試してください。",
+        restore_in_progress: "セットアップ復元を実行中です。",
+        username_exists: "このユーザー名はすでに使われています。",
       },
       entries: {
         invalid_cursor: "ページ指定を確認してください。",

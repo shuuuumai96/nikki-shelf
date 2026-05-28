@@ -26,6 +26,9 @@ services:
       NIKKI_DATABASE_URL: "postgres://nikki:nikki@postgres:5432/nikki?sslmode=disable"
       NIKKI_UPLOAD_DIR: "/uploads"
       NIKKI_PUBLIC_UPLOAD_BASE: "/uploads"
+      NIKKI_SIGNUP_ENABLED: "${NIKKI_SIGNUP_ENABLED:-false}"
+      NIKKI_FIRST_USER_SETUP_ENABLED: "${NIKKI_FIRST_USER_SETUP_ENABLED:-false}"
+      NIKKI_FIRST_USER_BOOTSTRAP_TOKEN: "${NIKKI_FIRST_USER_BOOTSTRAP_TOKEN:-}"
     ports:
       - "8080:8080"
     volumes:

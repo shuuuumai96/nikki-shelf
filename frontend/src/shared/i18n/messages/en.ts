@@ -44,6 +44,42 @@ export default {
     setupNote:
       "After this account is created, first-run setup signup closes automatically.",
   },
+  setup: {
+    panelLabel: "Initial setup",
+    heading: "Welcome to Nikki",
+    lead: "This Nikki instance has not been initialized. Create the first owner account or restore an operational backup archive.",
+    publicWarning:
+      "If this instance is already public, do not continue unless you are the operator.",
+    tokenHelp:
+      "The setup token is the value of NIKKI_FIRST_USER_BOOTSTRAP_TOKEN set by the operator before starting Nikki.",
+    token: "Setup token",
+    startFreshTitle: "Start fresh",
+    startFreshBody: "Create the first owner account for this empty Nikki.",
+    restoreTitle: "Restore from backup",
+    restoreBody:
+      "Upload a Nikki operational backup archive. Content backup zip files are not accepted here.",
+    backupFile: "Backup file",
+    backupFilePlaceholder: "No file selected",
+    chooseBackupFile: "Choose file",
+    verifyBackup: "Verify backup",
+    restoreBackup: "Restore",
+    restoreVerified: "Backup verified",
+    backupCreatedAt: "Created",
+    nikkiVersion: "Nikki version",
+    schemaVersion: "Schema version",
+    entryCount: "Entries",
+    imageCount: "Images",
+    backupSize: "Backup size",
+    restoreConfirm:
+      "Restore this backup into the empty Nikki instance and close setup after success.",
+    restoreMissingInput: "Enter the setup token and choose a backup file.",
+    restoreVerifyFirst: "Verify the backup before restoring.",
+    restoreConfirmRequired: "Confirm the restore before continuing.",
+    passwordConfirmation: "Password confirmation",
+    createOwner: "Create owner account",
+    passwordMismatch: "Password confirmation does not match.",
+    locked: "Setup is already complete.",
+  },
   nav: {
     main: "Main",
     today: "Today",
@@ -221,6 +257,15 @@ export default {
         username_exists: "This username is already in use.",
         csrf: "Check the request and try again.",
         rate_limited: "Too many authentication requests. Try again later.",
+      },
+      setup: {
+        invalid_input: "Check the setup form.",
+        invalid_token: "Check the setup token.",
+        invalid_backup: "Check the backup archive.",
+        already_initialized: "Setup is already complete.",
+        restore_failed: "Restore failed. Check the backup and try again.",
+        restore_in_progress: "Setup restore is in progress.",
+        username_exists: "This username is already in use.",
       },
       entries: {
         invalid_cursor: "Check the page cursor.",

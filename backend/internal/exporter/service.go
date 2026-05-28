@@ -217,13 +217,12 @@ const restoreInstructions = `# Restore Nikki Backup
 
 This archive is a portable content backup. It contains diary entries, image metadata embedded in entries.json, image files, and a manifest.
 
-For an operational restore of a self-hosted Nikki instance, prefer PostgreSQL and uploads-volume restore:
+For operational recovery of a self-hosted Nikki instance, use a Nikki operational backup archive created from the PostgreSQL custom-format dump and matching uploads archive:
 
-1. Stop Nikki.
-2. Restore PostgreSQL from a trusted pg_dump backup.
-3. Restore the uploads directory or Docker volume.
-4. Start Nikki.
-5. Confirm entries, dates, moods, tags, and images are visible.
+1. Start a new empty Nikki instance with a configured setup token.
+2. Open /setup and choose Restore from backup.
+3. Upload the trusted operational backup archive.
+4. Confirm entries, dates, moods, tags, and images are visible after login.
 
 The entries.json file is intended for inspection and future import tooling. Direct database restore from this archive is not yet automated.
 `
