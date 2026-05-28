@@ -145,7 +145,7 @@ Known failure states:
 
 ## 9. Backup and Restore Model
 
-Nikki has an app-level backup archive for entries, images, manifest data, and restore notes. Operational recovery uses PostgreSQL dump/restore and a matching uploads directory restore.
+Nikki has an app-level backup archive for entries, images, manifest data, and restore notes. Operational recovery uses a Nikki operational backup archive with a PostgreSQL custom-format dump and a matching uploads tar.
 
 Restore verification should be isolated from live volumes. Verification should include alternate port startup, entry and image counts, content hash checks where practical, and sample image HTTP checks.
 

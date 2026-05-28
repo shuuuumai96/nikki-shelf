@@ -49,6 +49,8 @@ func Run(ctx context.Context) error {
 		AllowAdditionalSignups:  cfg.AllowAdditionalSignups,
 		AllowFirstUserSetup:     cfg.AllowFirstUserSetup,
 		FirstUserBootstrapToken: cfg.FirstUserBootstrapToken,
+		DatabaseURL:             cfg.DatabaseURL,
+		UploadDir:               cfg.UploadDir,
 	})
 	imageService := images.NewService(imageRepo, imageStorage, entryRepo, images.ServiceConfig{
 		Quota: images.QuotaConfig{

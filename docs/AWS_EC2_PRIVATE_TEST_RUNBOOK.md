@@ -128,7 +128,7 @@ NIKKI_TRUSTED_PROXY_CIDRS=
 NIKKI_STRIP_IMAGE_METADATA=true
 ```
 
-`NIKKI_FIRST_USER_BOOTSTRAP_TOKEN` is required for the operator-controlled first signup path when the database is empty. Alternatively, set `NIKKI_FIRST_USER_SETUP_ENABLED=true` only for an explicitly trusted first-user browser setup flow, then return it to `false` after the owner account exists. Keep the token long, random, secret, and out of tickets, screenshots, shared terminal logs, and chat. `NIKKI_SIGNUP_ENABLED=false` keeps additional signup closed after the first user exists.
+`NIKKI_FIRST_USER_BOOTSTRAP_TOKEN` is required for the operator-controlled first setup path when the database is empty. Keep `NIKKI_FIRST_USER_SETUP_ENABLED=false`; browser setup at `/setup` still requires the token for owner creation and operational backup restore and does not depend on that flag. Keep the token long, random, secret, and out of tickets, screenshots, shared terminal logs, and chat. `NIKKI_SIGNUP_ENABLED=false` keeps additional signup closed after the first user exists.
 
 For the first private EC2 test, `direct` IP extraction is the safest default. If per-client IP handling through proxy headers is needed later, set `NIKKI_IP_EXTRACTOR_MODE=x-real-ip` and set `NIKKI_TRUSTED_PROXY_CIDRS` only after verifying the frontend Docker network CIDR:
 
@@ -173,7 +173,7 @@ your-domain.example {
 	encode gzip zstd
 
 	request_body {
-		max_size 16MB
+		max_size 512MB
 	}
 
 	reverse_proxy 127.0.0.1:8089 {
@@ -207,28 +207,35 @@ header Strict-Transport-Security "max-age=31536000; includeSubDomains"
 
 Use the HTTPS origin only.
 
-First signup succeeds using the bootstrap-token flow. On an empty database, verify signup without the bootstrap token is rejected:
+First setup succeeds using the token-gated setup flow. On an empty database, verify setup status:
+
+```bash
+curl -fsS https://<your-domain>/api/setup/status
+```
+
+Expected result: JSON with `needsSetup: true`, `canCreateOwner: true`, `canRestoreBackup: true`, and `requiresSetupToken: true`. This response must not reveal whether the configured token is present or correct.
+
+Verify setup without the setup token is rejected:
 
 ```bash
 curl -i \
   -H 'Content-Type: application/json' \
   -d '{"username":"owner","password":"replace-with-a-long-password"}' \
-  https://<your-domain>/api/auth/signup
+  https://<your-domain>/api/setup/owner
 ```
 
 Expected result: `403`.
 
-Then create the owner user with the bootstrap-token flow:
+Then create the owner user through `/setup` in the browser, restore a valid Nikki operational backup archive through `/setup`, or use the setup owner API:
 
 ```bash
 curl -i \
   -H 'Content-Type: application/json' \
-  -H 'X-Nikki-Bootstrap-Token: replace-with-long-random-bootstrap-token' \
-  -d '{"username":"owner","password":"replace-with-a-long-password"}' \
-  https://<your-domain>/api/auth/signup
+  -d '{"setupToken":"replace-with-long-random-bootstrap-token","username":"owner","password":"replace-with-a-long-password"}' \
+  https://<your-domain>/api/setup/owner
 ```
 
-Expected result: `200`, a session cookie, and creation of the owner user. The token and password in this example are placeholders only. Do not paste real tokens, passwords, cookies, screenshots containing them, or shared shell logs into tickets or chat.
+Expected result for owner creation: `200`, a session cookie, and creation of the owner user. Expected result for restore: verified archive, restored entries/images, setup lock, and return to login. A second call to `/api/setup/owner` or `/api/setup/restore` must return `409`. The token and password in this example are placeholders only. Do not paste real tokens, passwords, cookies, operational backup archives, screenshots containing them, or shared shell logs into tickets or chat.
 
 Browser checks:
 
@@ -287,10 +294,8 @@ ls -lh backups/*/
 
 Verify the newest backup directory contains:
 
-- PostgreSQL dump.
-- Uploads tar archive.
-- Manifest.
-- `SHA256SUMS`.
+- `nikki-operational-backup-<timestamp>.tar.gz`.
+- The archive contains `manifest.json`, `db/postgres.dump`, `uploads/uploads.tar`, and `SHA256SUMS` when checksum tooling is available.
 
 Negative uploads-volume test:
 
@@ -352,10 +357,17 @@ Run restore rehearsal in an isolated Compose project. Do not restore into the li
 docker compose -p nikki_restore -f docker-compose.yml up -d postgres
 ```
 
+Extract the operational archive:
+
+```bash
+mkdir -p /tmp/nikki-restore
+tar -xzf backups/<timestamp>/nikki-operational-backup-<timestamp>.tar.gz -C /tmp/nikki-restore
+```
+
 Restore database:
 
 ```bash
-cat backups/<timestamp>/nikki-postgres-<timestamp>.sql | docker compose -p nikki_restore exec -T postgres psql -U nikki -d nikki
+cat /tmp/nikki-restore/db/postgres.dump | docker compose -p nikki_restore exec -T postgres pg_restore --data-only --no-owner --disable-triggers -U nikki -d nikki
 ```
 
 Restore uploads:
@@ -363,8 +375,8 @@ Restore uploads:
 ```bash
 docker run --rm \
   -v nikki_restore_nikki_uploads:/uploads \
-  -v "$PWD/backups/<timestamp>:/backup:ro" \
-  alpine sh -c 'cd /uploads && tar -xf /backup/nikki-uploads-<timestamp>.tar'
+  -v /tmp/nikki-restore:/backup:ro \
+  alpine sh -c 'cd /uploads && tar -xf /backup/uploads/uploads.tar'
 ```
 
 Start an isolated backend/frontend using an alternate project name and non-conflicting ports, or follow the isolated backend procedure in `docs/BACKUP_RESTORE.md`.
@@ -445,11 +457,11 @@ The private EC2 test may start only if all items are true:
 - HTTPS reverse proxy config is ready.
 - `NIKKI_COOKIE_SECURE=true`.
 - `NIKKI_SIGNUP_ENABLED=false`.
-- `NIKKI_FIRST_USER_SETUP_ENABLED=false` unless intentionally running the trusted first-user setup flow.
+- `NIKKI_FIRST_USER_SETUP_ENABLED=false`.
 - `NIKKI_FIRST_USER_BOOTSTRAP_TOKEN` is set to a long random secret and is not a placeholder.
 - `NIKKI_CORS_ALLOWED_ORIGINS` is the exact HTTPS origin.
 - Backup positive test passes.
 - Invalid uploads volume backup test fails safely.
 - Age encryption positive test passes on EC2.
 - Restore rehearsal plan exists.
-- No one has pasted real cookies, passwords, backup contents, or env files into logs or tickets.
+- No one has pasted real setup tokens, cookies, passwords, backup contents, or env files into logs or tickets.

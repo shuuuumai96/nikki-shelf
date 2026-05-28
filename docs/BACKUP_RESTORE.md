@@ -27,35 +27,47 @@ GET /api/export/backup
 
 This archive is useful for export and inspection. It is not an automated database restore or import path, and Nikki does not currently provide a one-click import or restore action for it.
 
-The app-level JSON/Markdown export and content backup archive are bounded to avoid unbounded in-process memory growth. App-level JSON/Markdown export is limited to 5,000 entries. App-level backup archive creation is limited to 5,000 entries and 10,000 images. Larger installations should use the operational PostgreSQL dump plus matching uploads backup described below.
+The app-level JSON/Markdown export and content backup archive are bounded to avoid unbounded in-process memory growth. App-level JSON/Markdown export is limited to 5,000 entries. App-level backup archive creation is limited to 5,000 entries and 10,000 images. Larger installations should use the operational backup archive described below.
 
-## Operational Backup
+## Operational Backup Archive
 
-Create a PostgreSQL dump:
+Operational restore uses a Nikki operational backup archive, not the content backup zip:
 
-```bash
-docker compose exec postgres pg_dump -U nikki -d nikki > nikki.sql
+```text
+nikki-operational-backup-YYYYmmdd-HHMMSS.tar.gz
+├── manifest.json
+├── db/
+│   └── postgres.dump
+├── uploads/
+│   └── uploads.tar
+└── SHA256SUMS
 ```
 
-Back up the upload volume or directory at the same time. In the default Docker Compose setup, uploaded images are stored in the `nikki_uploads` Docker volume.
+`db/postgres.dump` is a PostgreSQL custom-format dump created with `pg_dump -Fc`. Restore uses `pg_restore`. `uploads/uploads.tar` contains the matching upload storage contents from the same backup run.
 
-For production Compose, prefer the backup script:
+For production Compose, use the backup script:
 
 ```bash
 ENV_FILE=.env.production ./scripts/backup-production.sh
 ```
 
-It creates a timestamped PostgreSQL dump, uploads tar archive, manifest, and checksums. If `AGE_RECIPIENT` is set, it also creates encrypted `.age` artifacts and fails if `age` is not installed. Backups contain private diary text and images; encrypted artifacts are recommended before copying backups to S3 or any external storage.
+It creates the timestamped operational `.tar.gz` archive. If `AGE_RECIPIENT` is set, it also creates an encrypted `.age` copy and fails if `age` is not installed. Backups contain private diary text, images, password hashes, and operational metadata; encrypted artifacts are recommended before copying backups to S3 or any external storage.
 
-The app-level backup archive and the operational backup set are different things. The archive is a readable export package. Operational recovery needs the database dump and the matching uploads backup restored together.
+The app-level backup archive and the operational backup archive are different things. The content archive is a readable export package. Operational recovery needs the PostgreSQL custom dump and the matching uploads archive restored together.
 
-## Operational Restore
+## First Setup Restore
 
-1. Stop Nikki.
-2. Restore the PostgreSQL data from the matching dump.
-3. Restore the uploads volume or directory from the matching image backup.
-4. Start Nikki.
-5. Sign in and verify entries, dates, moods, tags, and images.
+On a new empty instance, open `/setup` and choose **Restore from backup**. The restore path is available only when the users table is empty and requires `NIKKI_FIRST_USER_BOOTSTRAP_TOKEN`. The backend verifies the token, archive layout, optional SHA256 checksums, manifest, PostgreSQL dump, and uploads tar before running restore. After successful restore, setup is locked and the app returns to the login screen.
+
+This restore path intentionally does not import `nikki-backup.zip` content exports and is not available from normal Settings.
+
+Restore is rejected when:
+
+- the database already has any user
+- the setup token is missing or incorrect
+- the archive is not a valid Nikki operational backup archive
+- the uploads tar contains an absolute path, `..`, or another unsafe path
+- another setup restore is already in progress
 
 Do not restore a database dump from one point in time with an uploads backup from another point in time. That can create missing image files or orphan files.
 
@@ -63,11 +75,10 @@ Do not restore a database dump from one point in time with an uploads backup fro
 
 Use an isolated restore when verifying a backup without touching the live Nikki volumes.
 
-Create the operational backup:
+Create the operational backup archive:
 
 ```bash
-docker compose exec -T postgres pg_dump -U nikki -d nikki > nikki.sql
-docker run --rm -v nikki_nikki_uploads:/uploads -v "$PWD":/backup alpine tar -cf /backup/nikki-uploads.tar -C /uploads .
+ENV_FILE=.env.production ./scripts/backup-production.sh
 ```
 
 Start a separate PostgreSQL volume under another Compose project name:
@@ -79,13 +90,18 @@ docker compose -p nikki_restore up -d postgres
 Restore the database:
 
 ```bash
-cat nikki.sql | docker compose -p nikki_restore exec -T postgres psql -U nikki -d nikki
+mkdir -p /tmp/nikki-restore
+tar -xzf backups/<timestamp>/nikki-operational-backup-<timestamp>.tar.gz -C /tmp/nikki-restore
+cat /tmp/nikki-restore/db/postgres.dump | docker compose -p nikki_restore exec -T postgres pg_restore --data-only --no-owner --disable-triggers -U nikki -d nikki
 ```
 
 Restore uploads into the isolated uploads volume:
 
 ```bash
-docker run --rm -v nikki_restore_nikki_uploads:/uploads -v "$PWD":/backup alpine sh -c 'cd /uploads && tar -xf /backup/nikki-uploads.tar'
+docker run --rm \
+  -v nikki_restore_nikki_uploads:/uploads \
+  -v /tmp/nikki-restore:/backup:ro \
+  alpine sh -c 'cd /uploads && tar -xf /backup/uploads/uploads.tar'
 ```
 
 Avoid port collisions with the live app. Either use a temporary override file for alternate ports, or start the restored backend directly on an alternate port such as `18080`:
@@ -132,6 +148,8 @@ The restored entry count must match the source entry count, the restored image c
 
 ## Verification Checklist
 
+- `/setup` restores a valid operational archive only on an empty database with the correct setup token.
+- Setup is locked after restore and a second restore attempt returns a conflict.
 - Entries open by date.
 - Entry body text is present.
 - Mood and tags are present.

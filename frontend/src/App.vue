@@ -18,6 +18,20 @@ import type {
   EntryInput,
   SaveStatus,
 } from "./features/entries/types";
+import {
+  createOwner as createSetupOwner,
+  status as fetchSetupStatus,
+  restoreBackup as restoreSetupBackup,
+  verifyRestore as verifySetupRestore,
+} from "./features/setup/api";
+import SetupPanel from "./features/setup/components/SetupPanel.vue";
+import type {
+  SetupOwnerInput,
+  SetupRestoreFileInput,
+  SetupRestoreInput,
+  SetupStatus,
+} from "./features/setup/types";
+import { localizedErrorMessage } from "./shared/api/client";
 import AppSidebar from "./shared/components/AppSidebar.vue";
 import { useWritingShortcuts } from "./shared/composables/useWritingShortcuts";
 import { todayISO } from "./shared/utils/date";
@@ -38,6 +52,9 @@ const SettingsPanel = defineAsyncComponent(
 const auth = useAuthStore();
 const store = useEntryStore();
 const { t } = useI18n();
+const setupStatus = ref<SetupStatus | null>(null);
+const setupReady = ref(false);
+const setupError = ref("");
 const view = ref("today");
 const entriesMode = ref<"list" | "archive">("list");
 type EntrySurfaceMode = "reader" | "editor";
@@ -59,6 +76,11 @@ const diaryEditor = ref<{
 const navigationMessage = ref("");
 const { clearEntryFilters, filters, hasEntryFilters } = useEntryFilters();
 
+const appReady = computed(() => auth.ready && setupReady.value);
+const showSetup = computed(
+  () => !auth.user && Boolean(setupStatus.value?.needsSetup),
+);
+const authPanelError = computed(() => auth.error || setupError.value);
 const selectedId = computed(() => store.activeEntry?.id);
 
 onMounted(() => {
@@ -171,17 +193,30 @@ function blockedNavigationMessage(status: SaveStatus) {
 async function bootstrap() {
   await auth.bootstrap();
   if (auth.user) {
+    setupReady.value = true;
+    if (window.location.pathname === "/setup") {
+      replacePath("/");
+    }
     await store.bootstrap();
     entrySurfaceMode.value = resolveEntrySurfaceMode(
       store.activeDate,
       { entry: store.activeEntry },
       "app-start",
     );
+    return;
+  }
+
+  await refreshSetupStatus();
+  if (setupStatus.value?.needsSetup) {
+    replacePath("/setup");
+  } else if (window.location.pathname === "/setup") {
+    replacePath("/");
   }
 }
 
 async function login(input: AuthCredentials) {
   await auth.login(input);
+  replacePath("/");
   await store.bootstrap();
   entrySurfaceMode.value = resolveEntrySurfaceMode(
     store.activeDate,
@@ -192,7 +227,39 @@ async function login(input: AuthCredentials) {
 
 async function signup(input: AuthCredentials) {
   await auth.signup(input);
+  replacePath("/");
   await store.bootstrap();
+}
+
+async function createOwner(input: SetupOwnerInput) {
+  await auth.start(() => createSetupOwner(input));
+  setupStatus.value = null;
+  replacePath("/");
+  await store.bootstrap();
+  entrySurfaceMode.value = resolveEntrySurfaceMode(
+    store.activeDate,
+    { entry: store.activeEntry },
+    "app-start",
+  );
+}
+
+async function verifyRestore(input: SetupRestoreFileInput) {
+  return verifySetupRestore(input);
+}
+
+async function restoreBackup(input: SetupRestoreInput) {
+  await restoreSetupBackup(input);
+  auth.user = null;
+  setupStatus.value = {
+    needsSetup: false,
+    setupLocked: true,
+    canCreateOwner: false,
+    canRestoreBackup: false,
+    requiresSetupToken: true,
+    restoreInProgress: false,
+  };
+  setupError.value = "";
+  replacePath("/");
 }
 
 async function logout() {
@@ -200,6 +267,7 @@ async function logout() {
   store.clear();
   view.value = "today";
   entriesMode.value = "list";
+  await refreshSetupStatus();
 }
 
 function autosaveDiary(input: EntryInput) {
@@ -254,14 +322,29 @@ function navigationSourceLabel(source: EntryOpenSource) {
 
   return labels[source];
 }
+
+async function refreshSetupStatus() {
+  setupReady.value = false;
+  setupError.value = "";
+  try {
+    setupStatus.value = await fetchSetupStatus();
+  } catch (error) {
+    setupStatus.value = null;
+    setupError.value = localizedErrorMessage(error);
+  } finally {
+    setupReady.value = true;
+  }
+}
+
+function replacePath(path: string) {
+  if (window.location.pathname !== path) {
+    window.history.replaceState({}, "", path);
+  }
+}
 </script>
 
 <template>
-  <div
-    v-if="!auth.ready"
-    class="app-shell app-shell-loading"
-    aria-hidden="true"
-  >
+  <div v-if="!appReady" class="app-shell app-shell-loading" aria-hidden="true">
     <aside class="loading-sidebar">
       <div class="loading-brand">Nikki</div>
     </aside>
@@ -281,9 +364,21 @@ function navigationSourceLabel(source: EntryOpenSource) {
     </main>
   </div>
 
+  <SetupPanel
+    v-else-if="showSetup"
+    :can-create-owner="setupStatus?.canCreateOwner"
+    :can-restore-backup="setupStatus?.canRestoreBackup"
+    :error="authPanelError"
+    :loading="auth.loading"
+    :restore-backup="restoreBackup"
+    :setup-locked="setupStatus?.setupLocked"
+    :verify-restore="verifyRestore"
+    @create-owner="createOwner"
+  />
+
   <AuthPanel
     v-else-if="!auth.user"
-    :error="auth.error"
+    :error="authPanelError"
     :loading="auth.loading"
     @login="login"
     @signup="signup"

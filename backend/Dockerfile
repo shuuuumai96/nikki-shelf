@@ -12,7 +12,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o /out/nikki ./cmd/server
 FROM debian:bookworm-slim
 
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends wget \
+  && apt-get install -y --no-install-recommends postgresql-client wget \
   && rm -rf /var/lib/apt/lists/* \
   && useradd -r -u 10001 nikki \
   && mkdir -p /data /uploads \

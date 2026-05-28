@@ -34,6 +34,8 @@ Lightweight reflection, search, archive/reading mode, and retrieval improvements
 
 - Fixing build or test failures.
 - Removing or disabling fragile behavior when needed for reliability.
+- One-time token-gated first-user setup, because it replaces fragile bootstrap-token curl operation with a safer empty-database setup flow.
+- One-time token-gated operational backup restore during first setup, because it supports server migration and disaster recovery while preserving the empty-database and setup-token gates.
 - Improving autosave safety.
 - Improving image lifecycle safety.
 - Improving backup and restore.
@@ -52,6 +54,7 @@ Lightweight reflection, search, archive/reading mode, and retrieval improvements
 - New product features.
 - Quick Capture or quick-note capture surfaces.
 - Settings backup visibility UI, restore checklist UI links, backup dashboards, or other recoverability visibility features.
+- General backup dashboards, normal Settings restore UI, and content-backup zip import remain frozen.
 - New visual systems or broad UI redesign.
 - Advanced editor controls beyond the existing daily diary needs.
 - Photo management beyond safe attachment, deletion, backup, and restore.

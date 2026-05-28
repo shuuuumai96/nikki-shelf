@@ -57,6 +57,10 @@ func isMaxBytesError(err error) bool {
 	return errors.As(err, &maxBytesError)
 }
 
+func IsRequestTooLarge(err error) bool {
+	return isMaxBytesError(err) || errors.Is(err, ErrRequestTooLarge)
+}
+
 func JSON(c echo.Context, status int, value any) error {
 	return c.JSON(status, value)
 }

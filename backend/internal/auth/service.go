@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
+	"os/exec"
 	"regexp"
 	"strings"
 	"time"
@@ -16,6 +17,8 @@ import (
 )
 
 const SessionTTL = 30 * 24 * time.Hour
+const RoleOwner = "owner"
+const RoleUser = "user"
 
 var usernamePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{2,39}$`)
 
@@ -24,13 +27,22 @@ type Service struct {
 	allowAdditionalSignups  bool
 	allowFirstUserSetup     bool
 	firstUserBootstrapToken string
+	restorePostgres         func(context.Context, string) error
+	uploadDir               string
 	now                     func() time.Time
 }
 
 type serviceRepository interface {
 	CountUsers(ctx context.Context) (int, error)
+	CountEntries(ctx context.Context) (int, error)
+	CountImages(ctx context.Context) (int, error)
+	SetupLocked(ctx context.Context) (bool, error)
+	SetupRestoreInProgress(ctx context.Context) (bool, error)
+	BeginSetupRestore(ctx context.Context) error
+	ClearSetupRestoreInProgress(ctx context.Context) error
+	FinishSetupRestore(ctx context.Context) error
 	CreateUser(ctx context.Context, username string, passwordHash string, now time.Time) (UserRow, error)
-	CreateFirstUser(ctx context.Context, username string, passwordHash string, now time.Time) (UserRow, error)
+	CreateFirstOwner(ctx context.Context, username string, passwordHash string, now time.Time) (UserRow, error)
 	GetUserByUsername(ctx context.Context, username string) (UserRow, error)
 	CreateSession(ctx context.Context, userID int64, tokenHash string, csrfHash string, expiresAt time.Time, now time.Time) error
 	GetSessionByTokenHash(ctx context.Context, tokenHash string, now time.Time) (SessionRow, error)
@@ -44,6 +56,9 @@ type ServiceConfig struct {
 	AllowAdditionalSignups  bool
 	AllowFirstUserSetup     bool
 	FirstUserBootstrapToken string
+	DatabaseURL             string
+	UploadDir               string
+	PgRestorePath           string
 }
 
 func NewService(repo serviceRepository, configs ...ServiceConfig) *Service {
@@ -56,11 +71,19 @@ func NewService(repo serviceRepository, configs ...ServiceConfig) *Service {
 		allowAdditionalSignups:  cfg.AllowAdditionalSignups,
 		allowFirstUserSetup:     cfg.AllowFirstUserSetup,
 		firstUserBootstrapToken: strings.TrimSpace(cfg.FirstUserBootstrapToken),
+		restorePostgres:         pgRestoreRunner(cfg.DatabaseURL, cfg.PgRestorePath),
+		uploadDir:               cfg.UploadDir,
 		now:                     time.Now,
 	}
 }
 
 func (s *Service) Signup(ctx context.Context, input Credentials, bootstrapToken string) (SessionResult, error) {
+	if inProgress, err := s.SetupRestoreInProgress(ctx); err != nil {
+		return SessionResult{}, err
+	} else if inProgress {
+		return SessionResult{}, ErrRestoreInProgress
+	}
+
 	username, password, err := normalizeCredentials(input)
 	if err != nil {
 		return SessionResult{}, err
@@ -71,11 +94,15 @@ func (s *Service) Signup(ctx context.Context, input Credentials, bootstrapToken 
 		return SessionResult{}, err
 	}
 	firstUserSignup := userCount == 0
-	if firstUserSignup && !s.validFirstUserSignup(bootstrapToken) {
+	if firstUserSignup && !s.validFirstUserBootstrapToken(bootstrapToken) {
 		return SessionResult{}, ErrSignupClosed
 	}
 	if signupClosed(userCount, s.allowAdditionalSignups) {
 		return SessionResult{}, ErrSignupClosed
+	}
+
+	if firstUserSignup {
+		return s.createFirstOwner(ctx, username, password)
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
@@ -83,22 +110,9 @@ func (s *Service) Signup(ctx context.Context, input Credentials, bootstrapToken 
 		return SessionResult{}, err
 	}
 
-	var row UserRow
-	if firstUserSignup {
-		row, err = s.repo.CreateFirstUser(ctx, username, string(hash), s.now())
-	} else {
-		row, err = s.repo.CreateUser(ctx, username, string(hash), s.now())
-	}
+	row, err := s.repo.CreateUser(ctx, username, string(hash), s.now())
 	if err != nil {
 		return SessionResult{}, err
-	}
-
-	if userCount == 0 {
-		// Imported pre-auth entries belong to the first real account so upgrades
-		// from the single-user prototype do not orphan diary data.
-		if err := s.repo.ClaimLegacyEntries(ctx, row.ID); err != nil {
-			return SessionResult{}, err
-		}
 	}
 
 	return s.startSession(ctx, row)
@@ -117,8 +131,164 @@ func (s *Service) Config(ctx context.Context) (ConfigResponse, error) {
 	}, nil
 }
 
-func (s *Service) validFirstUserSignup(bootstrapToken string) bool {
-	return s.validFirstUserBootstrapToken(bootstrapToken) || s.allowFirstUserSetup
+func (s *Service) SetupStatus(ctx context.Context) (SetupStatusResponse, error) {
+	userCount, err := s.repo.CountUsers(ctx)
+	if err != nil {
+		return SetupStatusResponse{}, err
+	}
+
+	locked, err := s.repo.SetupLocked(ctx)
+	if err != nil {
+		return SetupStatusResponse{}, err
+	}
+
+	restoreInProgress, err := s.repo.SetupRestoreInProgress(ctx)
+	if err != nil {
+		return SetupStatusResponse{}, err
+	}
+
+	needsSetup := userCount == 0
+	setupLocked := userCount > 0 || locked || restoreInProgress
+	return SetupStatusResponse{
+		NeedsSetup:         needsSetup,
+		SetupLocked:        setupLocked,
+		CanCreateOwner:     needsSetup && !setupLocked,
+		CanRestoreBackup:   needsSetup && !setupLocked,
+		RequiresSetupToken: true,
+		RestoreInProgress:  restoreInProgress,
+	}, nil
+}
+
+func (s *Service) CreateFirstOwner(ctx context.Context, input SetupOwnerInput) (SessionResult, error) {
+	status, err := s.SetupStatus(ctx)
+	if err != nil {
+		return SessionResult{}, err
+	}
+	if status.RestoreInProgress {
+		return SessionResult{}, ErrRestoreInProgress
+	}
+	if !status.CanCreateOwner {
+		return SessionResult{}, ErrSetupLocked
+	}
+
+	username, password, err := normalizeCredentials(Credentials{
+		Username: input.Username,
+		Password: input.Password,
+	})
+	if err != nil {
+		return SessionResult{}, err
+	}
+
+	if !s.validFirstUserBootstrapToken(input.SetupToken) {
+		return SessionResult{}, ErrInvalidSetupToken
+	}
+
+	return s.createFirstOwner(ctx, username, password)
+}
+
+func (s *Service) VerifySetupRestore(ctx context.Context, input SetupRestoreVerifyInput) (SetupRestoreVerifyResponse, error) {
+	status, err := s.SetupStatus(ctx)
+	if err != nil {
+		return SetupRestoreVerifyResponse{}, err
+	}
+	if status.RestoreInProgress {
+		return SetupRestoreVerifyResponse{}, ErrRestoreInProgress
+	}
+	if !status.CanRestoreBackup {
+		return SetupRestoreVerifyResponse{}, ErrSetupLocked
+	}
+	if !s.validFirstUserBootstrapToken(input.SetupToken) {
+		return SetupRestoreVerifyResponse{}, ErrInvalidSetupToken
+	}
+
+	backup, err := prepareOperationalBackup(input.ArchivePath, input.ArchiveSize)
+	if err != nil {
+		return SetupRestoreVerifyResponse{}, err
+	}
+	defer backup.cleanup()
+
+	return backup.verifyResponse(), nil
+}
+
+func (s *Service) RestoreSetupBackup(ctx context.Context, input SetupRestoreInput) (SetupRestoreResponse, error) {
+	if !input.ConfirmRestore {
+		return SetupRestoreResponse{}, ErrRestoreConfirmationMissing
+	}
+
+	status, err := s.SetupStatus(ctx)
+	if err != nil {
+		return SetupRestoreResponse{}, err
+	}
+	if status.RestoreInProgress {
+		return SetupRestoreResponse{}, ErrRestoreInProgress
+	}
+	if !status.CanRestoreBackup {
+		return SetupRestoreResponse{}, ErrSetupLocked
+	}
+	if !s.validFirstUserBootstrapToken(input.SetupToken) {
+		return SetupRestoreResponse{}, ErrInvalidSetupToken
+	}
+
+	if err := s.repo.BeginSetupRestore(ctx); err != nil {
+		return SetupRestoreResponse{}, err
+	}
+	restoreSucceeded := false
+	defer func() {
+		if !restoreSucceeded {
+			_ = s.repo.ClearSetupRestoreInProgress(context.Background())
+		}
+	}()
+
+	backup, err := prepareOperationalBackup(input.ArchivePath, input.ArchiveSize)
+	if err != nil {
+		return SetupRestoreResponse{}, err
+	}
+	defer backup.cleanup()
+
+	if err := s.restorePostgres(ctx, backup.postgresDumpPath); err != nil {
+		return SetupRestoreResponse{}, ErrRestoreFailed
+	}
+
+	if err := extractUploadsTar(backup.uploadsTarPath, s.uploadDir); err != nil {
+		return SetupRestoreResponse{}, err
+	}
+
+	entryCount, err := s.repo.CountEntries(ctx)
+	if err != nil {
+		return SetupRestoreResponse{}, err
+	}
+	imageCount, err := s.repo.CountImages(ctx)
+	if err != nil {
+		return SetupRestoreResponse{}, err
+	}
+	userCount, err := s.repo.CountUsers(ctx)
+	if err != nil {
+		return SetupRestoreResponse{}, err
+	}
+	if userCount == 0 {
+		return SetupRestoreResponse{}, ErrRestoreCountMismatch
+	}
+	if backup.manifest.EntryCount != nil && entryCount != *backup.manifest.EntryCount {
+		return SetupRestoreResponse{}, ErrRestoreCountMismatch
+	}
+	if backup.manifest.ImageCount != nil && imageCount != *backup.manifest.ImageCount {
+		return SetupRestoreResponse{}, ErrRestoreCountMismatch
+	}
+
+	if err := s.repo.FinishSetupRestore(ctx); err != nil {
+		return SetupRestoreResponse{}, err
+	}
+	restoreSucceeded = true
+
+	return SetupRestoreResponse{
+		Restored:   true,
+		EntryCount: entryCount,
+		ImageCount: imageCount,
+	}, nil
+}
+
+func (s *Service) SetupRestoreInProgress(ctx context.Context) (bool, error) {
+	return s.repo.SetupRestoreInProgress(ctx)
 }
 
 func (s *Service) validFirstUserBootstrapToken(token string) bool {
@@ -134,7 +304,33 @@ func (s *Service) validFirstUserBootstrapToken(token string) bool {
 	return subtle.ConstantTimeCompare([]byte(expectedHash), []byte(providedHash)) == 1
 }
 
+func (s *Service) createFirstOwner(ctx context.Context, username string, password string) (SessionResult, error) {
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return SessionResult{}, err
+	}
+
+	row, err := s.repo.CreateFirstOwner(ctx, username, string(hash), s.now())
+	if err != nil {
+		return SessionResult{}, err
+	}
+
+	// Imported pre-auth entries belong to the first real account so upgrades
+	// from the single-user prototype do not orphan diary data.
+	if err := s.repo.ClaimLegacyEntries(ctx, row.ID); err != nil {
+		return SessionResult{}, err
+	}
+
+	return s.startSession(ctx, row)
+}
+
 func (s *Service) Login(ctx context.Context, input Credentials) (SessionResult, error) {
+	if inProgress, err := s.SetupRestoreInProgress(ctx); err != nil {
+		return SessionResult{}, err
+	} else if inProgress {
+		return SessionResult{}, ErrRestoreInProgress
+	}
+
 	username, password, err := normalizeCredentials(input)
 	if err != nil {
 		return SessionResult{}, ErrInvalidCredentials
@@ -153,6 +349,12 @@ func (s *Service) Login(ctx context.Context, input Credentials) (SessionResult, 
 }
 
 func (s *Service) UserByToken(ctx context.Context, token string) (User, error) {
+	if inProgress, err := s.SetupRestoreInProgress(ctx); err != nil {
+		return User{}, err
+	} else if inProgress {
+		return User{}, ErrRestoreInProgress
+	}
+
 	if strings.TrimSpace(token) == "" {
 		return User{}, ErrUnauthorized
 	}
@@ -166,6 +368,12 @@ func (s *Service) UserByToken(ctx context.Context, token string) (User, error) {
 }
 
 func (s *Service) UserWithCSRFByToken(ctx context.Context, token string) (User, error) {
+	if inProgress, err := s.SetupRestoreInProgress(ctx); err != nil {
+		return User{}, err
+	} else if inProgress {
+		return User{}, ErrRestoreInProgress
+	}
+
 	if strings.TrimSpace(token) == "" {
 		return User{}, ErrUnauthorized
 	}
@@ -278,7 +486,11 @@ func hashToken(token string) string {
 }
 
 func responseUser(row UserRow) User {
-	return User{ID: row.ID, Username: row.Username}
+	role := row.Role
+	if strings.TrimSpace(role) == "" {
+		role = RoleUser
+	}
+	return User{ID: row.ID, Username: row.Username, Role: role}
 }
 
 func userWithCSRF(user User, token string) User {
@@ -292,6 +504,13 @@ var errorSpecs = []struct {
 	kind   string
 }{
 	{ErrInvalidInput, 400, "auth.invalid_input"},
+	{ErrInvalidBackup, 400, "setup.invalid_backup"},
+	{ErrRestoreConfirmationMissing, 400, "setup.invalid_input"},
+	{ErrInvalidSetupToken, 403, "setup.invalid_token"},
+	{ErrRestoreInProgress, 503, "setup.restore_in_progress"},
+	{ErrRestoreCountMismatch, 500, "setup.restore_failed"},
+	{ErrRestoreFailed, 500, "setup.restore_failed"},
+	{ErrSetupLocked, 409, "setup.already_initialized"},
 	{ErrInvalidCredentials, 401, "auth.invalid_credentials"},
 	{ErrUnauthorized, 401, "auth.unauthorized"},
 	{ErrSignupClosed, 403, "auth.signup_closed"},
@@ -322,12 +541,37 @@ func signupClosed(userCount int, allowAdditionalSignups bool) bool {
 	return userCount > 0 && !allowAdditionalSignups
 }
 
-func signupMode(userCount int, allowFirstUserSetup bool, allowAdditionalSignups bool) string {
-	if userCount == 0 && allowFirstUserSetup {
-		return "setup"
-	}
+func signupMode(userCount int, _ bool, allowAdditionalSignups bool) string {
 	if userCount > 0 && allowAdditionalSignups {
 		return "open"
 	}
 	return "closed"
+}
+
+func pgRestoreRunner(databaseURL string, path string) func(context.Context, string) error {
+	binary := strings.TrimSpace(path)
+	if binary == "" {
+		binary = "pg_restore"
+	}
+	database := strings.TrimSpace(databaseURL)
+	return func(ctx context.Context, dumpPath string) error {
+		if database == "" {
+			return ErrRestoreFailed
+		}
+
+		cmd := exec.CommandContext(
+			ctx,
+			binary,
+			"--data-only",
+			"--no-owner",
+			"--disable-triggers",
+			"--dbname",
+			database,
+			dumpPath,
+		)
+		if err := cmd.Run(); err != nil {
+			return ErrRestoreFailed
+		}
+		return nil
+	}
 }

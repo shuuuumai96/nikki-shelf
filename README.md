@@ -32,7 +32,7 @@ Public exposure requires careful production configuration, access control, and b
 - desktop-supported image attachments
 - missing-image UI
 - app-level backup archive
-- operational backup and restore documentation
+- operational backup archive and first-setup restore
 - `cleanup-images` command for image/file consistency checks
 - Docker Compose deployment
 
@@ -79,8 +79,22 @@ The default runtime is Docker Compose. See [docs/ARCHITECTURE.md](docs/ARCHITECT
 
 For local evaluation or development:
 
-```bash
+```powershell
+$setupToken = python -c "import secrets; print(secrets.token_urlsafe(32))"
+$env:NIKKI_FIRST_USER_BOOTSTRAP_TOKEN = $setupToken
 docker compose up -d
+$setupToken
+```
+
+Use the printed value as the setup token on `/setup`. Keep it private; it is
+only for creating the first owner account on an empty database.
+
+On macOS/Linux shells:
+
+```bash
+export NIKKI_FIRST_USER_BOOTSTRAP_TOKEN="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
+docker compose up -d
+printf '%s\n' "$NIKKI_FIRST_USER_BOOTSTRAP_TOKEN"
 ```
 
 Default local endpoints from [docker-compose.yml](docker-compose.yml):
@@ -88,6 +102,12 @@ Default local endpoints from [docker-compose.yml](docker-compose.yml):
 - Frontend: `http://localhost:8089`
 - Backend API: `http://localhost:8080`
 - Health check: `http://localhost:8080/api/health`
+
+On an empty database, Nikki redirects unauthenticated browsers to `/setup`.
+That screen can create the first owner account or restore a Nikki operational
+backup archive. Both paths require the setup token. After the owner account
+exists or restore succeeds, setup is locked and additional signup remains closed
+unless `NIKKI_SIGNUP_ENABLED` is explicitly enabled.
 
 Persistent Docker volumes:
 
@@ -150,7 +170,9 @@ Diary data is personal and not reproducible if lost. Nikki data lives in two pla
 - PostgreSQL: users, sessions, diary entries, tags, moods, image metadata, and settings
 - Upload storage: image files referenced by database metadata
 
-Back up the database and uploads from the same point in time. The app-level backup archive is useful for export and inspection, but it is not an automated database restore or import path. Operational restore requires a PostgreSQL restore plus a matching uploads restore.
+Back up the database and uploads from the same point in time. The app-level backup archive is useful for export and inspection, but it is not an automated database restore or import path.
+
+Operational backups use `nikki-operational-backup-YYYYmmdd-HHMMSS.tar.gz`, which contains `manifest.json`, a PostgreSQL custom-format `db/postgres.dump`, `uploads/uploads.tar`, and optional `SHA256SUMS`. On a new empty instance, `/setup` can verify and restore this archive when the setup token matches `NIKKI_FIRST_USER_BOOTSTRAP_TOKEN`.
 
 Restore verification should use isolated volumes and non-conflicting ports, not live data volumes. For production-style backups:
 
@@ -158,7 +180,7 @@ Restore verification should use isolated volumes and non-conflicting ports, not 
 ENV_FILE=.env.production ./scripts/backup-production.sh
 ```
 
-Backups can contain private diary text and images. Encrypted backup artifacts are recommended before copying backups to external storage.
+Backups can contain private diary text, images, password hashes, and other operational data. Encrypted backup artifacts are recommended before copying backups to external storage.
 
 See [docs/BACKUP_RESTORE.md](docs/BACKUP_RESTORE.md).
 
@@ -195,7 +217,7 @@ See [docs/BACKUP_RESTORE.md](docs/BACKUP_RESTORE.md) for cleanup and repair deta
 
 Nikki can be operated in local, private, or public single-instance environments. Public exposure requires the operator to apply the production configuration, access controls, and backup/restore practices documented in this repository. The README is not a deployment runbook; use the linked operational docs for host-specific steps.
 
-Production Compose uses `.env.production`. Do not commit `.env.production`. For HTTPS production, use secure cookies, exact CORS origins, disabled public signup, and the documented operator-controlled first-user bootstrap flow when applicable. Backend and PostgreSQL ports must not be publicly exposed. See [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for production-relevant environment variables.
+Production Compose uses `.env.production`. Do not commit `.env.production`. For HTTPS production, use secure cookies, exact CORS origins, disabled public signup, and a long random `NIKKI_FIRST_USER_BOOTSTRAP_TOKEN`. The `/setup` screen is available only while the database has no users, and owner creation or operational backup restore through it still requires the token. If possible, keep the instance behind a Security Group, VPN, SSM tunnel, or Tailscale-style private path until setup is complete. Backend and PostgreSQL ports must not be publicly exposed. See [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for production-relevant environment variables.
 
 Uploaded images are served from local upload storage in the current single-host design. S3, if used, is for encrypted backup artifacts only, not as the image-serving backend.
 

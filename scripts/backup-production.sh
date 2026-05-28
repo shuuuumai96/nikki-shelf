@@ -10,21 +10,25 @@ UPLOADS_VOLUME="${UPLOADS_VOLUME:-${COMPOSE_PROJECT_NAME}_nikki_uploads}"
 AGE_RECIPIENT="${AGE_RECIPIENT:-}"
 DELETE_PLAINTEXT_AFTER_ENCRYPT="${DELETE_PLAINTEXT_AFTER_ENCRYPT:-false}"
 
-timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
+timestamp="$(date -u +%Y%m%d-%H%M%S)"
+created_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 run_dir="${BACKUP_DIR}/${timestamp}"
-db_dump="${run_dir}/nikki-postgres-${timestamp}.sql"
-uploads_archive="${run_dir}/nikki-uploads-${timestamp}.tar"
-manifest="${run_dir}/manifest-${timestamp}.txt"
+staging_dir="${run_dir}/archive"
+archive_name="nikki-operational-backup-${timestamp}.tar.gz"
+archive="${run_dir}/${archive_name}"
+db_dump="${staging_dir}/db/postgres.dump"
+uploads_archive="${staging_dir}/uploads/uploads.tar"
+manifest="${staging_dir}/manifest.json"
 
 compose() {
   docker compose --env-file "${ENV_FILE}" -f docker-compose.yml -f docker-compose.prod.yml "$@"
 }
 
-mkdir -p "${run_dir}"
+mkdir -p "${staging_dir}/db" "${staging_dir}/uploads"
 run_dir_abs="$(cd "${run_dir}" && pwd -P)"
 
-printf '%s\n' "Creating Nikki backup ${timestamp}"
-printf '%s\n' "WARNING: keep the PostgreSQL dump and uploads archive together. Both contain private diary data."
+printf '%s\n' "Creating Nikki operational backup ${timestamp}"
+printf '%s\n' "WARNING: operational backups contain private diary data and password hashes."
 
 if ! docker volume inspect "${UPLOADS_VOLUME}" >/dev/null 2>&1; then
   printf '%s\n' "ERROR: uploads volume does not exist: ${UPLOADS_VOLUME}" >&2
@@ -32,20 +36,20 @@ if ! docker volume inspect "${UPLOADS_VOLUME}" >/dev/null 2>&1; then
   exit 1
 fi
 
-compose exec -T postgres pg_dump -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" > "${db_dump}"
+compose exec -T postgres pg_dump -Fc -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" > "${db_dump}"
 
 if [ ! -s "${db_dump}" ]; then
-  printf '%s\n' "ERROR: PostgreSQL dump was not created or is empty: ${db_dump}" >&2
+  printf '%s\n' "ERROR: PostgreSQL custom-format dump was not created or is empty." >&2
   exit 1
 fi
 
 MSYS_NO_PATHCONV=1 docker run --rm \
   -v "${UPLOADS_VOLUME}:/uploads:ro" \
   -v "${run_dir_abs}:/backup" \
-  alpine tar -cf "/backup/nikki-uploads-${timestamp}.tar" -C /uploads .
+  alpine tar -cf "/backup/archive/uploads/uploads.tar" -C /uploads .
 
 if [ ! -s "${uploads_archive}" ]; then
-  printf '%s\n' "ERROR: uploads archive was not created or is empty: ${uploads_archive}" >&2
+  printf '%s\n' "ERROR: uploads archive was not created or is empty." >&2
   exit 1
 fi
 
@@ -54,20 +58,45 @@ if [ "${upload_item_count}" -le 1 ]; then
   printf '%s\n' "WARNING: uploads archive appears empty. This is OK only if Nikki has no uploaded images yet." >&2
 fi
 
+entry_count="$(compose exec -T postgres psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -Atc 'SELECT COUNT(*) FROM entries;' | tr -d '\r\n ')"
+image_count="$(compose exec -T postgres psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -Atc 'SELECT COUNT(*) FROM images;' | tr -d '\r\n ')"
+repo_version="$(git rev-parse --short HEAD 2>/dev/null || printf '%s' unknown)"
+
+cat > "${manifest}" <<EOF
+{
+  "format": "nikki-operational-backup-v1",
+  "backupCreatedAt": "${created_at}",
+  "nikkiVersion": "${repo_version}",
+  "schemaVersion": "1",
+  "entryCount": ${entry_count:-0},
+  "imageCount": ${image_count:-0}
+}
+EOF
+
 if command -v sha256sum >/dev/null 2>&1; then
-  (cd "${run_dir}" && sha256sum "$(basename "${db_dump}")" "$(basename "${uploads_archive}")" > SHA256SUMS)
+  (
+    cd "${staging_dir}"
+    sha256sum manifest.json db/postgres.dump uploads/uploads.tar > SHA256SUMS
+  )
+else
+  printf '%s\n' "WARNING: sha256sum is unavailable; archive will not include SHA256SUMS." >&2
 fi
 
-repo_version="$(git rev-parse --short HEAD 2>/dev/null || printf '%s' unknown)"
-{
-  printf 'timestamp=%s\n' "${timestamp}"
-  printf 'compose_project_name=%s\n' "${COMPOSE_PROJECT_NAME}"
-  printf 'repo_version=%s\n' "${repo_version}"
-  printf 'database_dump=%s\n' "$(basename "${db_dump}")"
-  printf 'uploads_archive=%s\n' "$(basename "${uploads_archive}")"
-  printf 'checksums=SHA256SUMS\n'
-  printf 'encrypted=%s\n' "$([ -n "${AGE_RECIPIENT}" ] && printf true || printf false)"
-} > "${manifest}"
+(
+  cd "${staging_dir}"
+  if [ -f SHA256SUMS ]; then
+    tar -czf "../${archive_name}" manifest.json db/postgres.dump uploads/uploads.tar SHA256SUMS
+  else
+    tar -czf "../${archive_name}" manifest.json db/postgres.dump uploads/uploads.tar
+  fi
+)
+
+if [ ! -s "${archive}" ]; then
+  printf '%s\n' "ERROR: operational backup archive was not created or is empty." >&2
+  exit 1
+fi
+
+rm -rf "${staging_dir}"
 
 if [ -n "${AGE_RECIPIENT}" ]; then
   if ! command -v age >/dev/null 2>&1; then
@@ -75,21 +104,22 @@ if [ -n "${AGE_RECIPIENT}" ]; then
     exit 1
   fi
 
-  age -r "${AGE_RECIPIENT}" -o "${db_dump}.age" "${db_dump}"
-  age -r "${AGE_RECIPIENT}" -o "${uploads_archive}.age" "${uploads_archive}"
-  age -r "${AGE_RECIPIENT}" -o "${manifest}.age" "${manifest}"
+  age -r "${AGE_RECIPIENT}" -o "${archive}.age" "${archive}"
   if command -v sha256sum >/dev/null 2>&1; then
-    (cd "${run_dir}" && sha256sum "$(basename "${db_dump}").age" "$(basename "${uploads_archive}").age" "$(basename "${manifest}").age" > SHA256SUMS.age)
+    (cd "${run_dir}" && sha256sum "${archive_name}.age" > SHA256SUMS.age)
   fi
 
   if [ "${DELETE_PLAINTEXT_AFTER_ENCRYPT}" = "true" ]; then
-    rm -f "${db_dump}" "${uploads_archive}" "${manifest}" "${run_dir}/SHA256SUMS"
-    printf '%s\n' "Plaintext backup artifacts deleted after encryption by explicit configuration."
+    rm -f "${archive}"
+    printf '%s\n' "Plaintext operational backup archive deleted after encryption by explicit configuration."
   fi
 fi
 
 printf '%s\n' "Backup complete:"
-printf '  %s\n' "${db_dump}"
-printf '  %s\n' "${uploads_archive}"
-printf '  %s\n' "${manifest}"
-printf '%s\n' "Restore must use both artifacts from this same timestamp."
+if [ -f "${archive}" ]; then
+  printf '  %s\n' "${archive}"
+fi
+if [ -f "${archive}.age" ]; then
+  printf '  %s\n' "${archive}.age"
+fi
+printf '%s\n' "Use the plaintext .tar.gz archive for first setup restore, or decrypt the .age copy first."
