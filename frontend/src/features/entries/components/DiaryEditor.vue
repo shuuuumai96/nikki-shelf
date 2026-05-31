@@ -510,10 +510,6 @@ function onPaste(event: ClipboardEvent) {
 }
 
 function queueFiles(files: File[], insertionPosition: number | null = null) {
-  if (isMobileViewport()) {
-    return;
-  }
-
   const available = imageSlotsLeft.value;
   if (available === 0) {
     return;
@@ -847,10 +843,6 @@ function moodLabel(mood: MoodKey) {
   return labels[mood];
 }
 
-function isMobileViewport() {
-  return window.matchMedia("(max-width: 480px)").matches;
-}
-
 function currentEditorPosition() {
   return markdownEditor.value?.currentPosition() ?? null;
 }
@@ -933,6 +925,16 @@ function errorMessage(error: unknown) {
           :label="t('common.focusMode')"
           @click="toggleFocusMode"
         />
+        <button
+          type="button"
+          class="mobile-photo-action"
+          :aria-label="t('images.addPhotos')"
+          :title="t('images.addPhotos')"
+          :disabled="imageSlotsLeft === 0"
+          @click="pickFiles"
+        >
+          <Camera :size="17" stroke-width="1.8" />
+        </button>
         <div v-if="entry" ref="entryChromeActions" class="entry-actions">
           <button
             type="button"
@@ -1147,19 +1149,19 @@ function errorMessage(error: unknown) {
         <Camera :size="16" stroke-width="1.8" />
         <span>{{ t("images.photo") }}</span>
       </button>
-      <label class="sr-only" for="entry-image-input">{{
-        t("images.addPhotos")
-      }}</label>
-      <input
-        id="entry-image-input"
-        ref="fileInput"
-        class="sr-only"
-        type="file"
-        accept="image/jpeg,image/png,image/gif,image/webp"
-        multiple
-        @change="onFilesSelected"
-      />
     </div>
+    <label class="sr-only" for="entry-image-input">{{
+      t("images.addPhotos")
+    }}</label>
+    <input
+      id="entry-image-input"
+      ref="fileInput"
+      class="sr-only"
+      type="file"
+      accept="image/jpeg,image/png,image/gif,image/webp"
+      multiple
+      @change="onFilesSelected"
+    />
 
     <div
       v-if="persistedImages.length || uploadImages.length"
@@ -1505,6 +1507,10 @@ function errorMessage(error: unknown) {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.mobile-photo-action {
+  display: none;
 }
 
 .entry-shortcuts__panel {
@@ -1860,7 +1866,7 @@ function errorMessage(error: unknown) {
 @media (max-width: 480px) {
   .entry-surface {
     padding-top: 22px;
-    padding-bottom: calc(112px + env(safe-area-inset-bottom));
+    padding-bottom: calc(184px + env(safe-area-inset-bottom));
   }
 
   .entry-surface__chrome {
@@ -1869,9 +1875,33 @@ function errorMessage(error: unknown) {
     margin-bottom: 18px;
   }
 
+  .entry-surface:not(.focus-mode) .entry-surface__chrome {
+    position: fixed;
+    z-index: 19;
+    right: auto;
+    bottom: calc(72px + env(safe-area-inset-bottom));
+    left: 50%;
+    display: grid;
+    width: min(
+      520px,
+      calc(
+        100vw - 24px - env(safe-area-inset-left) - env(safe-area-inset-right)
+      )
+    );
+    transform: translateX(-50%);
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+    border: 1px solid var(--border-control);
+    border-radius: var(--radius-md);
+    background: color-mix(in srgb, var(--color-sidebar) 96%, transparent);
+    box-shadow: 0 -10px 24px rgba(20, 20, 20, 0.08);
+    padding: 8px;
+    backdrop-filter: blur(12px);
+  }
+
   .entry-surface__date-nav {
     display: grid;
-    grid-template-columns: 40px minmax(0, 1fr) 40px;
+    grid-template-columns: 42px minmax(0, 1fr) 42px;
     width: 100%;
     gap: 6px;
   }
@@ -1880,6 +1910,7 @@ function errorMessage(error: unknown) {
     align-self: center;
     font-size: 16px;
     text-align: center;
+    white-space: nowrap;
   }
 
   .entry-surface__chrome-action {
@@ -1916,12 +1947,111 @@ function errorMessage(error: unknown) {
     background: var(--color-surface);
   }
 
+  .mobile-photo-action {
+    display: inline-grid;
+    width: 40px;
+    height: 40px;
+    flex: 0 0 auto;
+    place-items: center;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+    color: var(--color-muted);
+    padding: 0;
+  }
+
+  .mobile-photo-action:hover:not(:disabled),
+  .mobile-photo-action:focus-visible {
+    background: var(--surface-hover);
+    color: var(--color-text);
+  }
+
+  .mobile-photo-action:disabled {
+    opacity: 0.5;
+  }
+
   .actions {
+    width: 100%;
     justify-content: flex-end;
+  }
+
+  .entry-surface:not(.focus-mode) .actions {
+    align-items: center;
+    gap: 6px;
   }
 
   .save-status {
     min-height: 40px;
+  }
+
+  .entry-surface:not(.focus-mode) .save-status {
+    order: -1;
+    min-width: 0;
+    margin-right: auto;
+    white-space: normal;
+  }
+
+  .entry-surface:not(.focus-mode) .save-status span {
+    max-width: 142px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .entry-surface:not(.focus-mode) .entry-actions__menu,
+  .entry-surface:not(.focus-mode) .entry-shortcuts__panel {
+    top: auto;
+    right: 0;
+    bottom: calc(100% + 8px);
+    max-height: min(55vh, 360px);
+    overflow: auto;
+  }
+
+  .focus-mode .entry-surface__chrome {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .focus-mode .entry-surface__date-nav {
+    grid-column: 1;
+    grid-template-columns: 40px minmax(0, 1fr) 40px;
+    width: 100%;
+  }
+
+  .focus-mode .actions {
+    grid-column: 1;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .focus-mode .save-status {
+    order: -1;
+    min-width: 0;
+    margin-right: auto;
+  }
+
+  .focus-mode .focus-exit {
+    width: 40px;
+    min-width: 40px;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .focus-mode .focus-exit span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .focus-mode .image-grid {
+    display: grid;
   }
 
   .title-input {
@@ -1943,6 +2073,7 @@ function errorMessage(error: unknown) {
   }
 
   .image-bar .ui-action {
+    min-height: 44px;
     width: 100%;
   }
 

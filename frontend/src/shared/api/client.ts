@@ -27,8 +27,14 @@ export function currentCSRFToken(): string {
 
 export function localizedErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
+    if (isOfflineApiError(error)) {
+      return i18n.global.t("errors.offline");
+    }
     const message = localizedBackendError(error.kind);
     return message || error.message || i18n.global.t("errors.api");
+  }
+  if (isOfflineError(error)) {
+    return i18n.global.t("errors.offline");
   }
   if (error instanceof Error) {
     return error.message;
@@ -89,4 +95,18 @@ function localizedBackendError(kind: string): string {
 
   const key = `errors.backend.${kind}`;
   return i18n.global.te(key) ? i18n.global.t(key) : "";
+}
+
+function isOfflineError(error: unknown): boolean {
+  return (
+    typeof navigator !== "undefined" &&
+    !navigator.onLine &&
+    error instanceof TypeError
+  );
+}
+
+function isOfflineApiError(error: ApiError): boolean {
+  return (
+    typeof navigator !== "undefined" && !navigator.onLine && error.status === 0
+  );
 }

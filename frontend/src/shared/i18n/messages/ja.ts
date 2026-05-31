@@ -19,6 +19,7 @@ export default {
     entryActions: "日記の操作",
     saveBeforeExport: "保存後に書き出せます",
     exportMarkdown: "Markdownで書き出し",
+    offline: "オフラインです。保存や同期は接続が戻ってから再試行できます。",
   },
   auth: {
     panelLabel: "認証",
@@ -241,6 +242,7 @@ export default {
   errors: {
     api: "APIエラーが発生しました",
     generic: "エラーが発生しました",
+    offline: "オフラインです。接続が戻ってからもう一度試してください。",
     invalidDate: "有効な日付を入力してください。",
     backend: {
       request: {

@@ -19,6 +19,8 @@ export default {
     entryActions: "Diary actions",
     saveBeforeExport: "You can export after saving.",
     exportMarkdown: "Export Markdown",
+    offline:
+      "You are offline. Saving and sync can retry when connection returns.",
   },
   auth: {
     panelLabel: "Authentication",
@@ -242,6 +244,7 @@ export default {
   errors: {
     api: "An API error occurred.",
     generic: "An error occurred.",
+    offline: "You are offline. Try again when the connection returns.",
     invalidDate: "Enter a valid date.",
     backend: {
       request: {
