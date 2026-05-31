@@ -37,6 +37,9 @@
   --color-danger: var(--nikki-danger);
   --color-danger-bg: #fff7f6;
   --color-danger-border: #f0c8c3;
+  --color-warning-bg: #fff9e8;
+  --color-warning-border: #ead8a7;
+  --color-warning-text: #6c520f;
   --color-placeholder: var(--nikki-text-faint);
   --color-text-soft: #525252;
   --color-text-note: #666666;
