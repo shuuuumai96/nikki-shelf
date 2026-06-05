@@ -116,6 +116,23 @@ Persistent Docker volumes:
 
 ## Development
 
+Developers can choose either a local toolchain or Docker-only checks. Keep both
+paths working so contributors do not need to install every runtime locally just
+to validate the repository.
+
+Docker-only validation:
+
+```bash
+docker compose -f docker-compose.check.yml run --rm checks
+```
+
+This runs frontend install, format check, and production build, then backend
+tests, backend `goimports` check, and `git diff --check`. It uses Docker named
+volumes for dependency caches, `frontend/node_modules`, and `frontend/dist`, so
+the check should not leave generated files in the working tree.
+
+Local validation remains supported for developers who prefer local tools.
+
 Frontend install and build:
 
 ```bash

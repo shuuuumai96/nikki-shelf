@@ -17,17 +17,30 @@ Avoid expanding frozen areas without prior discussion, including offline-first P
 
 ## Verification
 
-Run the relevant checks before opening a pull request:
+Run the relevant checks before opening a pull request. You can use either the
+Docker-only path or local tooling.
+
+Docker-only verification:
+
+```bash
+docker compose -f docker-compose.check.yml run --rm checks
+```
+
+Local frontend build:
 
 ```bash
 cd frontend
 corepack pnpm build
 ```
 
+Local backend tests:
+
 ```bash
 cd backend
 go test ./...
 ```
+
+Local whitespace check:
 
 ```bash
 git diff --check
