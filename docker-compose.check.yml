@@ -1,0 +1,58 @@
+services:
+  checks:
+    build:
+      context: .
+      dockerfile: Dockerfile.check
+    working_dir: /workspace
+    environment:
+      GOCACHE: /cache/go-build
+      GOMODCACHE: /cache/go-mod
+      PNPM_HOME: /cache/pnpm-home
+    volumes:
+      - .:/workspace
+      - nikki_check_frontend_dist:/workspace/frontend/dist
+      - nikki_check_frontend_node_modules:/workspace/frontend/node_modules
+      - nikki_check_go_build:/cache/go-build
+      - nikki_check_go_mod:/cache/go-mod
+      - nikki_check_pnpm_home:/cache/pnpm-home
+      - nikki_check_pnpm_store:/cache/pnpm-store
+    command:
+      - /bin/bash
+      - -c
+      - |
+        set -euo pipefail
+
+        git config --global --add safe.directory /workspace
+        corepack pnpm config set store-dir /cache/pnpm-store
+
+        cd /workspace/frontend
+        corepack pnpm install --frozen-lockfile
+        corepack pnpm format:check
+        corepack pnpm build
+
+        cd /workspace/backend
+        go test ./...
+
+        find . -name '*.go' \
+          -not -path './vendor/*' \
+          -not -path './tmp/*' \
+          -not -name '*.pb.go' \
+          -print0 > /tmp/nikki-go-files
+
+        if [ -s /tmp/nikki-go-files ]; then
+          xargs -0 go run golang.org/x/tools/cmd/goimports@v0.45.0 \
+            -local github.com/shuuuumai96/nikki-shelf/backend \
+            -l < /tmp/nikki-go-files | tee /tmp/nikki-goimports-output
+          test ! -s /tmp/nikki-goimports-output
+        fi
+
+        cd /workspace
+        git diff --check
+
+volumes:
+  nikki_check_frontend_dist:
+  nikki_check_frontend_node_modules:
+  nikki_check_go_build:
+  nikki_check_go_mod:
+  nikki_check_pnpm_home:
+  nikki_check_pnpm_store:

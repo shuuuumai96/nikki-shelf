@@ -23,10 +23,17 @@ Release shape: the current release remains a single-tab, self-hosted diary for p
 
 This gate must pass before a private EC2 Docker Compose test is treated as deployment-ready.
 
+Validation may use either local developer toolchains or the Docker-only check
+runner. The Docker-only path is:
+
+```bash
+docker compose -f docker-compose.check.yml run --rm checks
+```
+
 | Gate | Required Evidence |
 | --- | --- |
-| Frontend build passes | `cd frontend && corepack pnpm install --frozen-lockfile && corepack pnpm build` |
-| Backend tests pass | `cd backend && go test ./...` |
+| Frontend build passes | Local `cd frontend && corepack pnpm install --frozen-lockfile && corepack pnpm build`, or Docker-only `docker compose -f docker-compose.check.yml run --rm checks` |
+| Backend tests pass | Local `cd backend && go test ./...`, or Docker-only `docker compose -f docker-compose.check.yml run --rm checks` |
 | Docker Compose build passes | `docker compose build` |
 | `.env.production` is required for production Compose | `docker compose -f docker-compose.yml -f docker-compose.prod.yml config` fails when `.env.production` or required variables are missing |
 | Production Compose config passes | `docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env.production config` |

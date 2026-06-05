@@ -16,6 +16,7 @@
 - Repository format on Windows if `python3` is unavailable: `python .\scripts\format.py`
 - Repository format check on Windows if `python3` is unavailable: `python .\scripts\format.py --check`
 - Backend test: `cd backend && go test ./...`
+- Docker-only checks: `docker compose -f docker-compose.check.yml run --rm checks`
 - Docker build: `docker compose build`
 - Run app: `docker compose up -d`
 
@@ -26,6 +27,7 @@
 - Backend formatting uses `goimports` with `github.com/shuuuumai96/nikki-shelf/backend` as the local import group.
 - Keep backend code data-oriented. Avoid large state structs and excessive branching; prefer small functions and maps/strategies where practical.
 - Keep UI simple, calm, document-oriented, and low-clutter.
+- Developers may validate with local toolchains or with Docker-only checks. Keep both paths working unless a change explicitly narrows the supported workflow.
 - Do not commit generated data, uploads, `node_modules`, or build output.
 - Do not implement items merely because documentation calls them "future", "later", "todo", "candidate", or "roadmap".
 - Future and roadmap items require an explicit task request.

@@ -10,6 +10,7 @@ This changelog follows a simple Keep a Changelog-style structure. Nikki has not 
 
 - Adopted Apache-2.0 as the explicit project license.
 - Added initial changelog and release/versioning policy documentation.
+- Added Docker-only repository validation for contributors who prefer not to install the local frontend/backend toolchains.
 
 ### Notes
 
