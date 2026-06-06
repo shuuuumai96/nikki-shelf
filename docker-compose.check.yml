@@ -47,7 +47,7 @@ services:
         fi
 
         cd /workspace
-        git diff --check
+        git --no-pager diff --check
 
 volumes:
   nikki_check_frontend_dist:
