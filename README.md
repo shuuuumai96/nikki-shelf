@@ -34,6 +34,7 @@ Public exposure requires careful production configuration, access control, and b
 - app-level backup archive
 - operational backup archive and first-setup restore
 - `cleanup-images` command for image/file consistency checks
+- installable web app metadata, icons, and basic app-shell caching
 - Docker Compose deployment
 
 ## What Nikki Does Not Do
@@ -45,7 +46,7 @@ Public exposure requires careful production configuration, access control, and b
 - full mobile photo diary workflow
 - rich inline image rendering or editing
 - full offline-first PWA behavior
-- service workers or offline writing
+- offline writing, offline sync, or background recovery
 - photo library management
 - public SaaS or multi-tenant hosting
 - sharing
@@ -65,7 +66,7 @@ These themes describe direction, not a commitment that the features already exis
 - **Lightweight Reflection**: support modest review and reflection without turning Nikki into analytics, coaching, or AI-first software.
 - **Recoverable Self-hosted Data**: keep backup, restore, consistency checks, and operator clarity central.
 - **Public OSS Readiness**: prepare documentation, contribution expectations, release process, and security handling for a public repository.
-- **Installable Web App**: cautiously reconsider manifest-only installability later. Service workers and offline writing remain out of scope unless separately approved.
+- **Installable Web App**: keep installability narrow: manifest metadata, app icons, standalone display, mobile web app meta tags, and basic service-worker app-shell caching. Offline writing, background sync, push notifications, and offline-first behavior remain out of scope unless separately approved.
 
 See [docs/ROADMAP.md](docs/ROADMAP.md).
 
@@ -127,9 +128,10 @@ docker compose -f docker-compose.check.yml run --rm checks
 ```
 
 This runs frontend install, format check, and production build, then backend
-tests, backend `goimports` check, and `git diff --check`. It uses Docker named
-volumes for dependency caches, `frontend/node_modules`, and `frontend/dist`, so
-the check should not leave generated files in the working tree.
+tests, backend `goimports` check, and `git --no-pager diff --check`. It uses
+Docker named volumes for dependency caches, `frontend/node_modules`, and
+`frontend/dist`, so the check should not leave generated files in the working
+tree.
 
 Local validation remains supported for developers who prefer local tools.
 
@@ -175,7 +177,7 @@ python .\scripts\format.py --check
 Repository checks and Docker commands:
 
 ```bash
-git diff --check
+git --no-pager diff --check
 docker compose build
 docker compose up -d
 ```
