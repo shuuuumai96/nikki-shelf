@@ -13,8 +13,6 @@ import AuthPanel from "./features/auth/components/AuthPanel.vue";
 import { useAuthStore } from "./features/auth/store";
 import type { AuthCredentials } from "./features/auth/types";
 import type { UploadImageRequest } from "./features/entries/api";
-import DiaryEditor from "./features/entries/components/DiaryEditor.vue";
-import EntryReader from "./features/entries/components/EntryReader.vue";
 import { useDateJump } from "./features/entries/composables/useDateJump";
 import { useEntryFilters } from "./features/entries/composables/useEntryFilters";
 import { moodOrder, moodSpecs } from "./features/entries/moods";
@@ -46,11 +44,17 @@ import { todayISO } from "./shared/utils/date";
 const CalendarMonth = defineAsyncComponent(
   () => import("./features/calendar/components/CalendarMonth.vue"),
 );
+const DiaryEditor = defineAsyncComponent(
+  () => import("./features/entries/components/DiaryEditor.vue"),
+);
 const EntryArchiveNav = defineAsyncComponent(
   () => import("./features/entries/components/EntryArchiveNav.vue"),
 );
 const EntryList = defineAsyncComponent(
   () => import("./features/entries/components/EntryList.vue"),
+);
+const EntryReader = defineAsyncComponent(
+  () => import("./features/entries/components/EntryReader.vue"),
 );
 const SettingsPanel = defineAsyncComponent(
   () => import("./features/settings/components/SettingsPanel.vue"),
