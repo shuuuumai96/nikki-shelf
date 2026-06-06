@@ -6,13 +6,14 @@ Release shape: the current release remains a single-tab, self-hosted diary for p
 
 | Gate | Status | Evidence |
 | --- | --- | --- |
-| Frontend build passed | Pass | `corepack pnpm build` |
-| Backend tests passed | Pass | `go test ./...` |
+| Frontend build passed | Pass | `docker compose -f docker-compose.check.yml run --rm checks`; local equivalent: `cd frontend && corepack pnpm install --frozen-lockfile && corepack pnpm build` |
+| Backend tests passed | Pass | `docker compose -f docker-compose.check.yml run --rm checks`; local equivalent: `cd backend && go test ./...` |
 | Clean restore verified | Pass | Source/restored entries `14 / 14`; source/restored images `2 / 2`; missing image count `0`; restored sample image HTTP `200` |
 | Backup includes entries and images | Pass | Content backup archive contains `entries.json`, `images/`, `manifest.json`, `RESTORE.md`; operational backup archive contains `manifest.json`, `db/postgres.dump`, `uploads/uploads.tar`, and checksums |
 | Cleanup dry-run works | Pass | `cleanup-images --dry-run` reports image/file mismatches without deletion |
 | Destructive cleanup verified | Pass | Inspected orphan file, took backup, ran cleanup, second dry-run was clean, valid image files remained |
 | Missing-image UI verified | Pass | Valid image displayed in reader and editor; missing image row displayed image ID, file name, public URL, entry date, and recovery hint; `cleanup-images --dry-run` confirmed the mismatch; existing editor delete flow removed the affected row when tested |
+| Image routes are owner-checked | Pass | Normal `/api/images/<id>/content` and legacy `/uploads/<name>` routes require authentication and verify entry ownership before serving files |
 | Rejected DFC scope absent | Pass | Quick Capture and recoverability visibility are not active release requirements; no Settings backup dashboard, restore checklist UI links, normal restore UI, or content-backup import is claimed |
 | Single-tab writing verified | Pass | 390px text writing and save status verified; desktop build verified |
 | Multi-tab editing explicitly unsupported | Pass | Frozen in `docs/FROZEN_SCOPE.md`; README states single-tab writing assumption |
@@ -72,6 +73,8 @@ This gate is mandatory before opening Nikki to the public internet on the single
 | Image upload/display/delete works | Upload an image, confirm it displays in reader and editor, delete it through the editor, and confirm it no longer displays |
 | Missing image state works | Create a disposable missing-file condition, confirm reader and editor show the missing-image placeholder with available recovery details, run `cleanup-images --dry-run` to confirm the mismatch, and verify existing editor delete behavior if deletion is used |
 | Unauthenticated API access returns expected 401 | `curl -i https://your-real-domain.example/api/entries` returns `401` |
+| Image routes reject unauthenticated access | Unauthenticated requests to `/api/images/<known-image-id>/content` and legacy `/uploads/<known-stored-name>` do not serve image bytes |
+| Service worker cache stays static-only | Production `frontend/public/sw.js` excludes `/api` and `/uploads`; authenticated API responses, uploads, and diary data are not cached by the service worker |
 | Backup command succeeds | `ENV_FILE=.env.production ./scripts/backup-production.sh` exits successfully |
 | Backup artifacts are complete | Operational backup archive includes `manifest.json`, `db/postgres.dump`, `uploads/uploads.tar`, and `SHA256SUMS` when checksum tooling is available |
 | Backup/export copy is accurate | Documentation states that app exports can contain private diary text/images and are not automated database restore |
@@ -92,5 +95,5 @@ This gate is mandatory before opening Nikki to the public internet on the single
 - full mobile photo diary workflow
 - inline rich image placement
 - full offline-first PWA behavior
-- service workers or offline writing
+- offline writing, offline sync, background recovery, or authenticated diary-data caching
 - photo library management

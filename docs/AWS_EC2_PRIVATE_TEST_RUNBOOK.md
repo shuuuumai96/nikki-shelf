@@ -1,6 +1,6 @@
 # Nikki AWS EC2 Private Test Runbook
 
-This runbook is for the first private AWS EC2 Docker Compose test only. It is not a broader public production launch checklist.
+This runbook is for the first private AWS EC2 Docker Compose test only. It assumes a Debian or Ubuntu EC2 host and is not a broader public production launch checklist.
 
 ## 1. Scope
 

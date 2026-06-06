@@ -10,7 +10,7 @@ The following areas are frozen until explicitly approved. Do not add, expand, or
 - mobile image upload, retry, and remove flows
 - rich inline image editing
 - full offline-first PWA behavior
-- service workers or offline writing
+- offline writing, offline sync, background recovery, or push notifications
 - photo library features
 - visual redesign
 - advanced drag-to-line image insertion
@@ -22,9 +22,9 @@ The following areas are frozen until explicitly approved. Do not add, expand, or
 
 ## PWA Boundary
 
-Full offline-first PWA support remains frozen. Do not add service workers, offline writing, offline sync, cache strategies, or background recovery behavior without a separate product and reliability decision.
+Full offline-first PWA support remains frozen. The existing service worker is limited to static app-shell caching for installability. Do not add offline writing, offline sync, background recovery, background sync, push notifications, or caching of authenticated diary data without a separate product and reliability decision.
 
-Simple installability may be reconsidered separately as a narrow manifest-only theme: web app manifest, icons, theme color, and standalone display. That work is not approved by this document and should not be bundled with offline-first behavior.
+Simple installability is limited to web app manifest metadata, icons, theme color, standalone display, mobile web app meta tags, and basic app-shell caching. It must not be bundled with offline-first writing behavior.
 
 ## Roadmap Candidate Boundary
 
@@ -58,4 +58,4 @@ Lightweight reflection, search, archive/reading mode, and retrieval improvements
 - New visual systems or broad UI redesign.
 - Advanced editor controls beyond the existing daily diary needs.
 - Photo management beyond safe attachment, deletion, backup, and restore.
-- Statistics, AI, sharing, reminders, search, reflection, or offline-first PWA features.
+- Statistics, AI, sharing, reminders, search, reflection, or offline-first PWA expansion.

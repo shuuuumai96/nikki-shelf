@@ -6,7 +6,7 @@ Nikki is a self-hosted writing cockpit for daily personal records.
 
 The primary experience is PC-browser diary writing: text-first daily records, modest metadata, desktop-supported image attachments, and recoverable self-hosted data. Nikki is for one person or a small trusted household, not a public SaaS or multi-tenant product.
 
-Smartphone support is secondary: reading, light edits, and possible future installability. Nikki should not be shaped around mobile-first capture or photo-library workflows.
+Smartphone support is secondary: reading, light edits, and limited installability. Nikki should not be shaped around mobile-first capture or photo-library workflows.
 
 ## 2. Release Scope
 
@@ -23,6 +23,7 @@ Supported:
 - desktop-supported image attachments
 - missing-image UI
 - `cleanup-images` command
+- limited installable web app support with app-shell caching
 
 Unsupported:
 
@@ -32,7 +33,7 @@ Unsupported:
 - full mobile photo diary workflow
 - inline rich image placement
 - full offline-first PWA behavior
-- service workers or offline writing
+- offline writing, offline sync, or background recovery
 - photo library management
 - public SaaS or multi-tenant hosting
 - sharing
@@ -60,7 +61,8 @@ Unsupported:
 - desktop-supported image attachments
 - missing-image visibility and image consistency cleanup
 - app-level backup archive
-- operational PostgreSQL and uploads backup/restore documentation
+- operational backup archive and first-setup restore
+- limited installability with static app-shell caching
 - Docker Compose self-host operation
 
 ### Candidate Next
@@ -71,7 +73,6 @@ These are roadmap candidates only and require explicit approval before implement
 - search and retrieval
 - lightweight reflection that stays close to diary review
 - public OSS readiness work
-- manifest-only installable web app support
 
 ### Explicitly Not a Goal
 
@@ -132,7 +133,7 @@ Images are diary entry attachments. They are not full photo library items.
 
 Desktop-supported image upload is in scope. Mobile image upload is unsupported for this release.
 
-Image metadata is stored in PostgreSQL in the `images` table. Image files are stored on disk in the configured upload directory. The backend generates stored file names and records public URLs. The UI has a missing-image state when a database row points to a file that is not present.
+Image metadata is stored in PostgreSQL in the `images` table. Image files are stored on disk in the configured upload directory. The backend generates stored file names and records compatibility public URLs, but normal image display uses `/api/images/<id>/content`. That route and legacy `/uploads/<name>` requests both require an authenticated session and resolve through image metadata plus entry ownership before serving file content. The UI has a missing-image state when a database row points to a file that is not present.
 
 `cleanup-images` detects inconsistencies between database metadata, entries, and files.
 
@@ -155,7 +156,7 @@ See [BACKUP_RESTORE.md](BACKUP_RESTORE.md).
 
 Nikki assumes a trusted operator-controlled environment. It is not designed as a public multi-tenant service.
 
-Access to diary data is authenticated. File upload handling validates detected image content types, applies size limits, stores generated file names, and serves uploads by basename to avoid path traversal through the upload URL.
+Access to diary data and uploaded images is authenticated. File upload handling validates detected image content types, applies size limits, stores generated file names, and serves image content only after database-backed ownership checks. The upload directory must not be exposed as a public static webroot.
 
 Operators are responsible for deployment security, backups, restore testing, and access control around the host. Nikki does not claim enterprise security, hardened SaaS security, or complete protection.
 
@@ -165,7 +166,7 @@ Operators are responsible for deployment security, backups, restore testing, and
 - no automatic merge
 - no release-supported mobile image upload
 - no full offline-first PWA behavior
-- no service workers or offline writing
+- no offline writing, offline sync, background recovery, or push notifications
 - no photo library features
 - local draft is a convenience, not a backup
 - desktop image attachments only

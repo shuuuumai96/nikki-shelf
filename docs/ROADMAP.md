@@ -75,19 +75,21 @@ This roadmap is direction, not commitment. Items below describe possible product
 
 ## P2: Cautious Installable Web App
 
-**Goal:** Consider installability as a small browser convenience.
+**Goal:** Keep installability as a small browser convenience.
 
 **Why it matters:** Some users may prefer launching Nikki like an app while still using online self-hosted data.
 
-**Non-goals:** Service workers, offline writing, background sync, push notifications, or mobile-first product direction.
+**Current status:** Nikki has installable web app metadata, app icons, standalone display, mobile web app meta tags, and basic service-worker app-shell caching.
+
+**Non-goals:** Offline writing, offline sync, background recovery, background sync, push notifications, authenticated diary-data caching, or mobile-first product direction.
 
 **Risks:** PWA language can imply offline guarantees that Nikki does not provide. Installability can also distract from PC-browser writing reliability.
 
-**Suggested acceptance criteria:**
+**Acceptance criteria:**
 
-- Scope is limited to manifest, icons, theme color, and standalone display.
+- Scope is limited to manifest metadata, icons, theme color, standalone display, mobile web app meta tags, and static app-shell caching.
 - Documentation states that offline writing is unsupported.
-- No service worker is introduced.
+- The service worker does not cache authenticated API responses, uploads, or diary data.
 - Desktop browser behavior remains the primary acceptance target.
 
 ## P3: Offline Draft, Mobile Image Upload, AI Reflection, Multiple Journals

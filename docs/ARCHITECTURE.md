@@ -4,12 +4,13 @@
 
 Nikki is a self-hosted, text-first diary for daily personal records. It is designed for one person or a small trusted household, with PC-browser writing as the primary experience, recoverable self-hosted data, and desktop-supported safe image attachments.
 
-The current release is intentionally small. It supports daily text writing, tags, moods, normal single-tab autosave, desktop image attachments, app-level backup export, operational restore documentation, and image consistency cleanup.
+The current release is intentionally small. It supports daily text writing, tags, moods, normal single-tab autosave, desktop image attachments, app-level backup export, first-setup operational restore, image consistency cleanup, and limited installable web app behavior.
 
 ## 2. Runtime Components
 
 - `frontend/`: Vue 3 + Vite application. The production container builds static assets and serves them with nginx.
 - `frontend/nginx/default.conf`: nginx configuration. It serves the frontend and proxies `/api/` and legacy `/uploads/` image requests to the backend service.
+- `frontend/public/manifest.webmanifest` and `frontend/public/sw.js`: limited installability metadata and basic static app-shell caching. The service worker must not cache authenticated API responses, uploads, or diary data.
 - `backend/`: Go application using Echo and pgx-compatible PostgreSQL access through `database/sql`.
 - PostgreSQL: stores users, sessions, diary entries, image metadata, and settings.
 - Uploads storage: stores image files in `NIKKI_UPLOAD_DIR`; Docker Compose mounts this as the `nikki_uploads` volume.
@@ -136,10 +137,11 @@ See [BACKUP_RESTORE.md](BACKUP_RESTORE.md).
 
 ## 9. Operational Commands
 
-Frontend build:
+Frontend install and build:
 
 ```bash
 cd frontend
+corepack pnpm install --frozen-lockfile
 corepack pnpm build
 ```
 
@@ -153,7 +155,7 @@ go test ./...
 Whitespace check:
 
 ```bash
-git diff --check
+git --no-pager diff --check
 ```
 
 Docker Compose startup:
@@ -208,7 +210,7 @@ Unsupported in this release:
 - rich inline image placement
 - drag-to-line image insertion
 - full offline-first PWA behavior
-- service workers or offline writing
+- offline writing, offline sync, background recovery, or authenticated diary-data caching
 - photo library management
 - sharing
 - AI features
