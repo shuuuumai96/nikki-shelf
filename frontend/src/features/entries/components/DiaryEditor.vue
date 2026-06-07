@@ -9,6 +9,7 @@ import {
 } from "lucide-vue-next";
 import {
   computed,
+  defineAsyncComponent,
   nextTick,
   onBeforeUnmount,
   onMounted,
@@ -38,9 +39,18 @@ import type {
   SaveStatus,
 } from "../types";
 import EntryImageAttachment from "./EntryImageAttachment.vue";
-import MarkdownEditor from "./MarkdownEditor.vue";
+import MarkdownEditorLoadingSurface from "./MarkdownEditorLoadingSurface.vue";
 import MoodSelector from "./MoodSelector.vue";
 import TagInput from "./TagInput.vue";
+
+const MarkdownEditor = defineAsyncComponent({
+  delay: 0,
+  loader: async () => {
+    await afterNextPaint();
+    return import("./MarkdownEditor.vue");
+  },
+  loadingComponent: MarkdownEditorLoadingSurface,
+});
 
 const props = defineProps<{
   entry: Entry | null;
@@ -627,13 +637,13 @@ async function startUpload(item: UploadImageItem) {
     item.persisted = image;
     item.progress = 100;
     if (item.insertionPosition === null) {
-      markdownEditor.value?.insertImage({
+      markdownEditor.value?.insertImage?.({
         url: image.url,
         fileName: image.fileName,
       });
     } else {
       item.insertionPosition =
-        markdownEditor.value?.insertImageAtPosition(item.insertionPosition, {
+        markdownEditor.value?.insertImageAtPosition?.(item.insertionPosition, {
           url: image.url,
           fileName: image.fileName,
         }) ?? item.insertionPosition;
@@ -844,7 +854,15 @@ function moodLabel(mood: MoodKey) {
 }
 
 function currentEditorPosition() {
-  return markdownEditor.value?.currentPosition() ?? null;
+  return markdownEditor.value?.currentPosition?.() ?? null;
+}
+
+function afterNextPaint() {
+  return new Promise<void>((resolve) => {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => resolve());
+    });
+  });
 }
 
 function isSupportedImage(file: File) {
