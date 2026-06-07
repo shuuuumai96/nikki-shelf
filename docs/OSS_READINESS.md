@@ -10,7 +10,7 @@ The top-level `NOTICE` file contains project notice information. `THIRD_PARTY_NO
 
 ## Dependency License Audit
 
-A bounded manual/local dependency license review was performed on 2026-05-22 for the current dependency set. This was a manual current-tree review only, not continuous compliance automation or a claim of full legal compliance.
+A bounded manual/local dependency license review was performed on 2026-06-07 for the current dependency set. This was a manual current-tree review only, not continuous compliance automation or a claim of full legal compliance.
 
 Review inputs:
 
@@ -20,7 +20,7 @@ Review inputs:
 Review result:
 
 - No blocking dependency license issue was found in this bounded review.
-- Frontend dependency licenses reported by pnpm were MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, and Python-2.0.
+- Frontend dependency licenses reported by pnpm were MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, BlueOak-1.0.0, and Python-2.0.
 - `argparse@2.0.1`, a transitive frontend dependency of `markdown-it`, reports `Python-2.0`; treat it as a notice/redistribution item to preserve in release materials rather than ignoring it.
 - Backend Go module license files reviewed as MIT, ISC, or BSD-style licenses. The `golang.org/x/*` modules also include the standard Go project `PATENTS` file.
 
@@ -55,7 +55,7 @@ Until stable release support is defined, security support should be described as
 
 ## Secret Scanning
 
-A manual local review of the current tracked repository was performed on 2026-05-22. The review covered `git ls-files`, tracked filenames, tracked text content, documentation examples, and `.gitignore` coverage for common local secret and data-artifact paths.
+A manual local review of the current tracked repository was performed on 2026-06-07. The review covered `git ls-files`, tracked filenames, tracked text content, documentation examples, and `.gitignore` coverage for common local secret and data-artifact paths.
 
 Review result:
 

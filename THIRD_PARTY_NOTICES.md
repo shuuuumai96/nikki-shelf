@@ -18,7 +18,7 @@ The current frontend dependency set includes:
 - `pinia`.
 - `vue-i18n`.
 
-The current bounded review found permissive licenses such as MIT, Apache-2.0, BSD-style, ISC, and Python-2.0 for a transitive frontend dependency.
+The current bounded review found permissive licenses such as MIT, Apache-2.0, BSD-style, ISC, BlueOak-1.0.0, and Python-2.0 for a transitive frontend dependency.
 
 ## Backend
 
