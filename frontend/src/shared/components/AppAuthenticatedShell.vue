@@ -209,6 +209,7 @@ function navigationSourceLabel(source: EntryOpenSource) {
 .app-shell {
   display: grid;
   height: 100dvh;
+  min-height: 100dvh;
   grid-template-columns: 230px 1fr;
   overflow: hidden;
 }
@@ -252,18 +253,20 @@ main {
   .app-shell {
     display: block;
     height: 100dvh;
+    min-height: 100dvh;
   }
 
   main {
-    height: 100svh;
-    padding-bottom: calc(72px + env(safe-area-inset-bottom));
+    height: 100dvh;
+    min-height: 0;
+    padding-bottom: calc(84px + env(safe-area-inset-bottom));
     -webkit-overflow-scrolling: touch;
   }
 }
 
 @media (max-width: 480px) {
   main {
-    padding-bottom: calc(76px + env(safe-area-inset-bottom));
+    padding-bottom: calc(84px + env(safe-area-inset-bottom));
   }
 }
 </style>

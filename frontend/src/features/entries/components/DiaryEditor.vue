@@ -92,7 +92,6 @@ type UploadImageItem = {
   started: boolean;
   active: boolean;
   upload: UploadImageRequest | null;
-  insertionPosition: number | null;
 };
 
 type ConflictRecoveryDraft = EntryInput & {
@@ -114,16 +113,7 @@ const editorReady = ref(false);
 const focusMode = ref(false);
 const openEntryChromePanel = ref<EntryChromePanel>(null);
 const entryChromeActions = ref<HTMLElement | null>(null);
-const pendingFileInsertionPosition = ref<number | null>(null);
 const fileInput = ref<HTMLInputElement | null>(null);
-const markdownEditor = ref<{
-  insertImage: (image: { url: string; fileName?: string }) => void;
-  insertImageAtPosition: (
-    position: number,
-    image: { url: string; fileName?: string },
-  ) => number | null;
-  currentPosition: () => number | null;
-} | null>(null);
 const autosaveTimer = ref<number | null>(null);
 const syncingFromProps = ref(false);
 const localDirty = ref(false);
@@ -482,29 +472,21 @@ function clearAutosaveTimer() {
 }
 
 function pickFiles() {
-  pendingFileInsertionPosition.value = currentEditorPosition();
   fileInput.value?.click();
 }
 
 function onFilesSelected(event: Event) {
   const target = event.target as HTMLInputElement;
-  queueFiles(
-    Array.from(target.files || []),
-    pendingFileInsertionPosition.value,
-  );
-  pendingFileInsertionPosition.value = null;
+  queueFiles(Array.from(target.files || []));
   target.value = "";
 }
 
 function onDrop(event: DragEvent) {
-  queueFiles(
-    Array.from(event.dataTransfer?.files || []),
-    currentEditorPosition(),
-  );
+  queueFiles(Array.from(event.dataTransfer?.files || []));
 }
 
-function onEditorImageDrop(payload: { files: File[]; position: number }) {
-  queueFiles(payload.files, payload.position);
+function onEditorImageDrop(payload: { files: File[] }) {
+  queueFiles(payload.files);
 }
 
 function onPaste(event: ClipboardEvent) {
@@ -516,10 +498,10 @@ function onPaste(event: ClipboardEvent) {
   }
 
   event.preventDefault();
-  queueFiles(files, currentEditorPosition());
+  queueFiles(files);
 }
 
-function queueFiles(files: File[], insertionPosition: number | null = null) {
+function queueFiles(files: File[]) {
   const available = imageSlotsLeft.value;
   if (available === 0) {
     return;
@@ -540,9 +522,7 @@ function queueFiles(files: File[], insertionPosition: number | null = null) {
     })
     .slice(0, available);
 
-  const items = selected.map((file) =>
-    createUploadItem(file, insertionPosition),
-  );
+  const items = selected.map((file) => createUploadItem(file));
   uploadImages.value = [...uploadImages.value, ...items];
   const uploadableItems: UploadImageItem[] = [];
   items.forEach((item) => {
@@ -554,20 +534,12 @@ function queueFiles(files: File[], insertionPosition: number | null = null) {
     uploadableItems.push(item);
   });
 
-  if (insertionPosition === null) {
-    uploadableItems.forEach((item) => {
-      void startUpload(item);
-    });
-    return;
-  }
-
-  void startPositionedUploads(uploadableItems, insertionPosition);
+  uploadableItems.forEach((item) => {
+    void startUpload(item);
+  });
 }
 
-function createUploadItem(
-  file: File,
-  insertionPosition: number | null,
-): UploadImageItem {
+function createUploadItem(file: File): UploadImageItem {
   const objectUrl = URL.createObjectURL(file);
   return {
     id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -582,24 +554,7 @@ function createUploadItem(
     started: false,
     active: true,
     upload: null,
-    insertionPosition,
   };
-}
-
-async function startPositionedUploads(
-  items: UploadImageItem[],
-  insertionPosition: number,
-) {
-  // Run positioned uploads serially so each inserted image can advance the next
-  // markdown cursor. Parallel completion would scramble paste/drop order.
-  let nextPosition = insertionPosition;
-  for (const item of items) {
-    item.insertionPosition = nextPosition;
-    await startUpload(item);
-    if (typeof item.insertionPosition === "number") {
-      nextPosition = item.insertionPosition;
-    }
-  }
 }
 
 async function startUpload(item: UploadImageItem) {
@@ -636,18 +591,6 @@ async function startUpload(item: UploadImageItem) {
 
     item.persisted = image;
     item.progress = 100;
-    if (item.insertionPosition === null) {
-      markdownEditor.value?.insertImage?.({
-        url: image.url,
-        fileName: image.fileName,
-      });
-    } else {
-      item.insertionPosition =
-        markdownEditor.value?.insertImageAtPosition?.(item.insertionPosition, {
-          url: image.url,
-          fileName: image.fileName,
-        }) ?? item.insertionPosition;
-    }
     removeCompletedUpload(item);
   } catch (error) {
     if (!item.active) {
@@ -851,10 +794,6 @@ function moodLabel(mood: MoodKey) {
   };
 
   return labels[mood];
-}
-
-function currentEditorPosition() {
-  return markdownEditor.value?.currentPosition?.() ?? null;
 }
 
 function afterNextPaint() {
@@ -1146,7 +1085,6 @@ function errorMessage(error: unknown) {
 
     <div class="entry-surface__body">
       <MarkdownEditor
-        ref="markdownEditor"
         v-model="form.body"
         @image-drop="onEditorImageDrop"
         @ready="editorReady = true"
@@ -1884,40 +1822,18 @@ function errorMessage(error: unknown) {
 @media (max-width: 480px) {
   .entry-surface {
     padding-top: 22px;
-    padding-bottom: calc(184px + env(safe-area-inset-bottom));
+    padding-bottom: calc(112px + env(safe-area-inset-bottom));
   }
 
   .entry-surface__chrome {
+    grid-template-columns: minmax(0, 1fr);
     align-items: start;
     gap: 10px;
     margin-bottom: 18px;
   }
 
-  .entry-surface:not(.focus-mode) .entry-surface__chrome {
-    position: fixed;
-    z-index: 19;
-    right: auto;
-    bottom: calc(72px + env(safe-area-inset-bottom));
-    left: 50%;
-    display: grid;
-    width: min(
-      520px,
-      calc(
-        100vw - 24px - env(safe-area-inset-left) - env(safe-area-inset-right)
-      )
-    );
-    transform: translateX(-50%);
-    grid-template-columns: minmax(0, 1fr);
-    gap: 8px;
-    border: 1px solid var(--border-control);
-    border-radius: var(--radius-md);
-    background: color-mix(in srgb, var(--color-sidebar) 96%, transparent);
-    box-shadow: 0 -10px 24px rgba(20, 20, 20, 0.08);
-    padding: 8px;
-    backdrop-filter: blur(12px);
-  }
-
   .entry-surface__date-nav {
+    grid-column: 1;
     display: grid;
     grid-template-columns: 42px minmax(0, 1fr) 42px;
     width: 100%;
@@ -1989,6 +1905,7 @@ function errorMessage(error: unknown) {
   }
 
   .actions {
+    grid-column: 1;
     width: 100%;
     justify-content: flex-end;
   }
@@ -2014,15 +1931,6 @@ function errorMessage(error: unknown) {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-
-  .entry-surface:not(.focus-mode) .entry-actions__menu,
-  .entry-surface:not(.focus-mode) .entry-shortcuts__panel {
-    top: auto;
-    right: 0;
-    bottom: calc(100% + 8px);
-    max-height: min(55vh, 360px);
-    overflow: auto;
   }
 
   .focus-mode .entry-surface__chrome {

@@ -280,7 +280,8 @@ function afterNextPaint() {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
-  .memory-rail {
+  .memory-rail,
+  .sidebar :deep(.memory-rail) {
     display: none;
   }
 
@@ -302,8 +303,8 @@ function afterNextPaint() {
     border-bottom: 0;
     background: color-mix(in srgb, var(--color-sidebar) 96%, transparent);
     box-shadow: 0 -10px 24px rgba(20, 20, 20, 0.08);
-    padding: 7px max(12px, env(safe-area-inset-right))
-      calc(8px + env(safe-area-inset-bottom))
+    padding: 6px max(12px, env(safe-area-inset-right))
+      calc(6px + env(safe-area-inset-bottom))
       max(12px, env(safe-area-inset-left));
     backdrop-filter: blur(12px);
   }
@@ -319,7 +320,7 @@ function afterNextPaint() {
   }
 
   .nav-item {
-    min-height: 52px;
+    min-height: 48px;
     grid-template-columns: 1fr;
     justify-items: center;
     gap: 3px;
