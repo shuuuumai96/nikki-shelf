@@ -6,6 +6,27 @@ This changelog follows a simple Keep a Changelog-style structure. Nikki has not 
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-06-07
+
+### Added
+
+- Added frontend characterization tests for the app shell, setup flow, authenticated navigation, and offline banner behavior.
+
+### Changed
+
+- Split the main frontend app shell into smaller view, shell, navigation, and loading components.
+- Lazy-loaded heavier entry and settings views to reduce the initial frontend bundle.
+- Clarified release-boundary documentation around limited installable web app behavior, unsupported offline diary-data caching, and supported restore behavior.
+
+### Fixed
+
+- Fixed setup restore page scrolling so long restore forms remain usable on constrained viewports.
+- Fixed Docker-only validation so git diff checks do not invoke a pager.
+
+### Notes
+
+- No database schema, authentication, or backup/restore format changes are included in this release.
+
 ## [0.2.0] - 2026-06-05
 
 ### Added
