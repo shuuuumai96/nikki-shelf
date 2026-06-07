@@ -434,8 +434,10 @@ function formatBytes(bytes: number) {
 <style scoped>
 .setup-screen {
   display: grid;
-  min-height: 100dvh;
-  place-items: center;
+  height: 100dvh;
+  align-items: start;
+  justify-items: center;
+  overflow-y: auto;
   background: var(--color-wash);
   padding: 42px 18px;
 }
