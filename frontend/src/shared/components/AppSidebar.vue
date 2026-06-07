@@ -7,11 +7,21 @@ import {
   Search,
   Settings,
 } from "lucide-vue-next";
+import { defineAsyncComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import type { AuthUser } from "../../features/auth/types";
-import EntryMemorySearch from "../../features/entries/components/EntryMemorySearch.vue";
+import EntryMemorySearchLoading from "../../features/entries/components/EntryMemorySearchLoading.vue";
 import type { Stats } from "../../features/entries/types";
 import { todayISO } from "../utils/date";
+
+const EntryMemorySearch = defineAsyncComponent({
+  delay: 0,
+  loader: async () => {
+    await afterNextPaint();
+    return import("../../features/entries/components/EntryMemorySearch.vue");
+  },
+  loadingComponent: EntryMemorySearchLoading,
+});
 
 const props = defineProps<{
   modelValue: string;
@@ -43,6 +53,14 @@ function isNavItemActive(key: string) {
   }
 
   return props.modelValue === key;
+}
+
+function afterNextPaint() {
+  return new Promise<void>((resolve) => {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => resolve());
+    });
+  });
 }
 </script>
 

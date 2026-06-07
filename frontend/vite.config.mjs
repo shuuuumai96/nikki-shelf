@@ -1,5 +1,5 @@
 import vue from "@vitejs/plugin-vue";
-import { defineConfig } from "vite";
+import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   plugins: [vue()],
@@ -9,5 +9,8 @@ export default defineConfig({
       "/api": "http://localhost:8080",
       "/uploads": "http://localhost:8080",
     },
+  },
+  test: {
+    environment: "happy-dom",
   },
 });
