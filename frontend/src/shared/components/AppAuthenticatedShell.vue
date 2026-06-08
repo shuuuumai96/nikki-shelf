@@ -18,15 +18,16 @@ import { useWritingShortcuts } from "../composables/useWritingShortcuts";
 import { todayISO } from "../utils/date";
 import AppSidebar from "./AppSidebar.vue";
 
-const CalendarView = defineAsyncComponent(
-  () => import("../../features/calendar/components/CalendarView.vue"),
-);
-const EntriesView = defineAsyncComponent(
-  () => import("../../features/entries/components/EntriesView.vue"),
-);
-const SettingsPanel = defineAsyncComponent(
-  () => import("../../features/settings/components/SettingsPanel.vue"),
-);
+const loadCalendarView = () =>
+  import("../../features/calendar/components/CalendarView.vue");
+const loadEntriesView = () =>
+  import("../../features/entries/components/EntriesView.vue");
+const loadSettingsPanel = () =>
+  import("../../features/settings/components/SettingsPanel.vue");
+
+const CalendarView = defineAsyncComponent(loadCalendarView);
+const EntriesView = defineAsyncComponent(loadEntriesView);
+const SettingsPanel = defineAsyncComponent(loadSettingsPanel);
 
 const props = defineProps<{
   authLoading: boolean;
@@ -58,6 +59,7 @@ onMounted(() => {
     { entry: props.store.activeEntry },
     "app-start",
   );
+  preloadNavigationViews();
 });
 
 useWritingShortcuts({
@@ -131,6 +133,14 @@ function navigationSourceLabel(source: EntryOpenSource) {
   };
 
   return labels[source];
+}
+
+function preloadNavigationViews() {
+  void Promise.all([
+    loadCalendarView(),
+    loadEntriesView(),
+    loadSettingsPanel(),
+  ]).catch(() => {});
 }
 </script>
 

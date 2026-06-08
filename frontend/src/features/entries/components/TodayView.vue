@@ -1,19 +1,10 @@
 <script setup lang="ts">
-import { defineAsyncComponent, ref } from "vue";
+import { ref } from "vue";
 import type { UploadImageRequest } from "../api";
 import type { EntrySurfaceMode } from "../composables/useEntrySurfaceMode";
 import type { Entry, EntryInput, SaveStatus } from "../types";
-import DiaryEditorLoadingSurface from "./DiaryEditorLoadingSurface.vue";
-
-const DiaryEditor = defineAsyncComponent({
-  delay: 0,
-  loader: async () => {
-    await afterNextPaint();
-    return import("./DiaryEditor.vue");
-  },
-  loadingComponent: DiaryEditorLoadingSurface,
-});
-const EntryReader = defineAsyncComponent(() => import("./EntryReader.vue"));
+import DiaryEditor from "./DiaryEditor.vue";
+import EntryReader from "./EntryReader.vue";
 
 defineProps<{
   activeDate: string;
@@ -57,14 +48,6 @@ defineExpose({
   flushPendingAutosave,
   toggleFocusMode,
 });
-
-function afterNextPaint() {
-  return new Promise<void>((resolve) => {
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => resolve());
-    });
-  });
-}
 </script>
 
 <template>
