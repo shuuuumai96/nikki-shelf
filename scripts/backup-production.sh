@@ -3,10 +3,9 @@ set -eu
 
 ENV_FILE="${ENV_FILE:-.env.production}"
 BACKUP_DIR="${BACKUP_DIR:-./backups}"
-COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-nikki}"
 POSTGRES_DB="${POSTGRES_DB:-nikki}"
 POSTGRES_USER="${POSTGRES_USER:-nikki}"
-UPLOADS_VOLUME="${UPLOADS_VOLUME:-${COMPOSE_PROJECT_NAME}_nikki_uploads}"
+UPLOADS_VOLUME="${UPLOADS_VOLUME:-}"
 AGE_RECIPIENT="${AGE_RECIPIENT:-}"
 DELETE_PLAINTEXT_AFTER_ENCRYPT="${DELETE_PLAINTEXT_AFTER_ENCRYPT:-false}"
 
@@ -24,11 +23,38 @@ compose() {
   docker compose --env-file "${ENV_FILE}" -f docker-compose.yml -f docker-compose.prod.yml "$@"
 }
 
+detect_uploads_volume() {
+  backend_container="$(compose ps -q backend 2>/dev/null || true)"
+  if [ -z "${backend_container}" ]; then
+    printf '%s\n' "ERROR: could not find the backend container for this Compose project." >&2
+    printf '%s\n' "Start the production stack or set UPLOADS_VOLUME explicitly." >&2
+    exit 1
+  fi
+
+  detected_volume="$(
+    docker inspect \
+      --format '{{range .Mounts}}{{if and (eq .Destination "/uploads") (eq .Type "volume")}}{{.Name}}{{end}}{{end}}' \
+      "${backend_container}"
+  )"
+  if [ -z "${detected_volume}" ]; then
+    printf '%s\n' "ERROR: could not detect a Docker volume mounted at /uploads on backend container: ${backend_container}" >&2
+    printf '%s\n' "Set UPLOADS_VOLUME explicitly if uploads are mounted differently." >&2
+    exit 1
+  fi
+
+  printf '%s\n' "${detected_volume}"
+}
+
 mkdir -p "${staging_dir}/db" "${staging_dir}/uploads"
 run_dir_abs="$(cd "${run_dir}" && pwd -P)"
 
 printf '%s\n' "Creating Nikki operational backup ${timestamp}"
 printf '%s\n' "WARNING: operational backups contain private diary data and password hashes."
+
+if [ -z "${UPLOADS_VOLUME}" ]; then
+  UPLOADS_VOLUME="$(detect_uploads_volume)"
+fi
+printf '%s\n' "Using uploads volume: ${UPLOADS_VOLUME}"
 
 if ! docker volume inspect "${UPLOADS_VOLUME}" >/dev/null 2>&1; then
   printf '%s\n' "ERROR: uploads volume does not exist: ${UPLOADS_VOLUME}" >&2

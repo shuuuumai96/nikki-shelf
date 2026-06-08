@@ -47,7 +47,7 @@ docker compose -f docker-compose.check.yml run --rm checks
 | CSRF protects mutating authenticated requests | Authenticated `POST`, `PUT`, and `DELETE` requests require `X-CSRF-Token`; `GET` export/download routes still work without it |
 | Trusted proxy behavior is explicit | `NIKKI_IP_EXTRACTOR_MODE` and `NIKKI_TRUSTED_PROXY_CIDRS` match the deployed reverse proxy chain |
 | Auth rate limiting exists | `NIKKI_AUTH_RATE_LIMIT_IP_ATTEMPTS`, `NIKKI_AUTH_RATE_LIMIT_ACCOUNT_ATTEMPTS`, and `NIKKI_AUTH_RATE_LIMIT_WINDOW` protect login, signup, setup owner creation, and setup restore APIs |
-| Backup command exists | `scripts/backup-production.sh` creates a timestamped Nikki operational backup archive |
+| Backup command exists | `scripts/backup-production.sh` creates a timestamped Nikki operational backup archive and detects the backend `/uploads` Docker volume when `UPLOADS_VOLUME` is not set |
 | Backup refuses missing uploads volume | `UPLOADS_VOLUME=missing-volume scripts/backup-production.sh` fails before running `tar` |
 | Backup artifacts are usable as one set | Backup creates a non-empty operational `.tar.gz` containing DB dump, uploads archive, manifest, and checksums from the same timestamp, or clearly warns if uploads are empty |
 | Encrypted backup path is available | `AGE_RECIPIENT=... scripts/backup-production.sh` creates `.age` artifacts; missing `age` fails |
@@ -75,7 +75,7 @@ This gate is mandatory before opening Nikki to the public internet on the single
 | Unauthenticated API access returns expected 401 | `curl -i https://your-real-domain.example/api/entries` returns `401` |
 | Image routes reject unauthenticated access | Unauthenticated requests to `/api/images/<known-image-id>/content` and legacy `/uploads/<known-stored-name>` do not serve image bytes |
 | Service worker cache stays static-only | Production `frontend/public/sw.js` excludes `/api` and `/uploads`; authenticated API responses, uploads, and diary data are not cached by the service worker |
-| Backup command succeeds | `ENV_FILE=.env.production ./scripts/backup-production.sh` exits successfully |
+| Backup command succeeds | `ENV_FILE=.env.production ./scripts/backup-production.sh` detects the production backend `/uploads` Docker volume and exits successfully |
 | Backup artifacts are complete | Operational backup archive includes `manifest.json`, `db/postgres.dump`, `uploads/uploads.tar`, and `SHA256SUMS` when checksum tooling is available |
 | Backup/export copy is accurate | Documentation states that app exports can contain private diary text/images and are not automated database restore |
 | Isolated restore succeeds | Restore test uses isolated volumes and alternate ports, not production volumes |
