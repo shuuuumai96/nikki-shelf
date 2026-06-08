@@ -115,9 +115,7 @@ describe("DiaryEditor image uploads", () => {
       promise: Promise.resolve(image()),
     }));
     const wrapper = mountEditor({ uploadImage });
-    await vi.dynamicImportSettled();
-    await flushPromises();
-    await nextTick();
+    await waitForMarkdownEditor(wrapper);
 
     await wrapper.find(".image-bar").trigger("drop", {
       dataTransfer: {
@@ -135,6 +133,18 @@ describe("DiaryEditor image uploads", () => {
     );
   });
 });
+
+async function waitForMarkdownEditor(wrapper: ReturnType<typeof mountEditor>) {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    await vi.dynamicImportSettled();
+    await flushPromises();
+    await nextTick();
+    if (wrapper.find(".markdown-editor-stub").exists()) {
+      return;
+    }
+  }
+  throw new Error("Markdown editor stub did not render");
+}
 
 function mountEditor(overrides: {
   uploadImage: (payload: {

@@ -80,3 +80,17 @@
     Inter, "Noto Sans JP", ui-sans-serif, system-ui, -apple-system,
     BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
+
+@media (max-width: 720px) {
+  :root {
+    --page-x: 20px;
+    --page-y: 26px;
+  }
+}
+
+@media (max-width: 480px) {
+  :root {
+    --page-x: 16px;
+    --page-y: 22px;
+  }
+}

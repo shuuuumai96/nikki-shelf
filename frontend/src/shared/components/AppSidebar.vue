@@ -320,15 +320,36 @@ function afterNextPaint() {
   }
 
   .nav-item {
+    position: relative;
     min-height: 48px;
     grid-template-columns: 1fr;
     justify-items: center;
+    border-color: transparent;
     gap: 3px;
     padding: 5px 2px 4px;
     font-size: 11px;
     line-height: 1.2;
     text-align: center;
   }
+
+  .nav-item.active {
+    border-color: transparent;
+    background: transparent;
+    color: var(--color-text);
+  }
+
+  .nav-item.active::before {
+    position: absolute;
+    top: 2px;
+    left: 50%;
+    width: 24px;
+    height: 2px;
+    border-radius: 999px;
+    background: currentColor;
+    content: "";
+    transform: translateX(-50%);
+  }
+
   .nav-item span {
     max-width: 100%;
   }

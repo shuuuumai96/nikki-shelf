@@ -103,22 +103,12 @@
 }
 
 @media (max-width: 720px) {
-  :root {
-    --page-x: 20px;
-    --page-y: 26px;
-  }
-
   .ui-page {
     padding-bottom: 48px;
   }
 }
 
 @media (max-width: 480px) {
-  :root {
-    --page-x: 16px;
-    --page-y: 22px;
-  }
-
   .ui-page {
     padding-bottom: calc(96px + env(safe-area-inset-bottom));
   }

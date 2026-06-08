@@ -78,15 +78,22 @@ const { t } = useI18n();
   .moods {
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 6px;
+    gap: 5px;
   }
 
   .mood {
     position: relative;
     min-width: 0;
-    min-height: 40px;
+    min-height: 38px;
     justify-content: center;
+    border-color: var(--border-subtle);
     padding: 0;
+  }
+
+  .mood.active {
+    border-color: var(--color-text);
+    background: var(--surface-active);
+    color: var(--color-text);
   }
 
   .mood span {
