@@ -28,10 +28,7 @@ import TagInput from "./TagInput.vue";
 
 const MarkdownEditor = defineAsyncComponent({
   delay: 0,
-  loader: async () => {
-    await afterNextPaint();
-    return import("./MarkdownEditor.vue");
-  },
+  loader: () => import("./MarkdownEditor.vue"),
   loadingComponent: MarkdownEditorLoadingSurface,
 });
 
@@ -557,14 +554,6 @@ function moodLabel(mood: MoodKey) {
 
   return labels[mood];
 }
-
-function afterNextPaint() {
-  return new Promise<void>((resolve) => {
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => resolve());
-    });
-  });
-}
 </script>
 
 <template>
@@ -690,10 +679,6 @@ function afterNextPaint() {
   padding-left: max(var(--page-x), calc((100% - var(--page-max)) / 2));
   padding-top: 34px;
   padding-bottom: 58px;
-}
-
-.editor:not(.editor-ready) {
-  visibility: hidden;
 }
 
 .entry-surface__title {

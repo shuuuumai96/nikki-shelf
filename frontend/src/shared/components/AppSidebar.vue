@@ -304,7 +304,7 @@ function afterNextPaint() {
     background: color-mix(in srgb, var(--color-sidebar) 96%, transparent);
     box-shadow: 0 -10px 24px rgba(20, 20, 20, 0.08);
     padding: 6px max(12px, env(safe-area-inset-right))
-      calc(6px + env(safe-area-inset-bottom))
+      calc(18px + env(safe-area-inset-bottom))
       max(12px, env(safe-area-inset-left));
     backdrop-filter: blur(12px);
   }
