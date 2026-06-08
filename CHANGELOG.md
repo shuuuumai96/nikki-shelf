@@ -6,6 +6,12 @@ This changelog follows a simple Keep a Changelog-style structure. Nikki has not 
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed production backup uploads-volume detection so Compose project names derived from deployment directories are handled automatically.
+- Fixed duplicate rendering of uploaded entry images.
+- Fixed mobile layout collapse on iPhone Safari around the bottom navigation and editor chrome.
+
 ## [0.3.0] - 2026-06-07
 
 ### Added
