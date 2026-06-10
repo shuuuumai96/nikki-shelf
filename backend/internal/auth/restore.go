@@ -39,6 +39,9 @@ type operationalManifest struct {
 	ImageCount      *int
 }
 
+// prepareOperationalBackup stages an uploaded operational archive into a private
+// temp directory. Verification and restore share this contract, so unknown
+// members are rejected before any database restore can start.
 func prepareOperationalBackup(archivePath string, archiveSize int64) (operationalBackup, error) {
 	tempDir, err := os.MkdirTemp("", "nikki-setup-restore-*")
 	if err != nil {
@@ -232,6 +235,8 @@ func verifyOperationalSums(files map[string]extractedBackupFile, sumsData []byte
 		return nil
 	}
 
+	// SHA256SUMS may be omitted for compatibility, but when present it must
+	// cover every payload file the restore path depends on.
 	lines := strings.Split(string(sumsData), "\n")
 	checked := 0
 	seen := map[string]bool{}
@@ -279,6 +284,8 @@ func parseOperationalManifest(data []byte) (operationalManifest, []string, error
 		return operationalManifest{}, nil, ErrInvalidBackup
 	}
 
+	// Accept a few historical field names so older operational backups can be
+	// inspected, but surface missing current fields as warnings.
 	manifest := operationalManifest{
 		BackupCreatedAt: firstString(raw, "backupCreatedAt", "createdAt", "timestamp"),
 		NikkiVersion:    firstString(raw, "nikkiVersion", "appVersion", "version"),
@@ -354,6 +361,8 @@ func validateUploadsTar(uploadsTarPath string) error {
 	}
 	defer file.Close()
 
+	// Validate the nested uploads archive before pg_restore so malicious paths
+	// or special files are rejected while the database is still untouched.
 	reader := tar.NewReader(file)
 	var totalSize int64
 	for {
@@ -479,6 +488,8 @@ func safeTarPath(name string) (string, error) {
 	if name == "" {
 		return "", ErrInvalidBackup
 	}
+	// Tar member names must remain relative on both Unix and Windows; drive
+	// letters are rejected before path.Clean can make them look ordinary.
 	if strings.Contains(name, ":") {
 		return "", ErrInvalidBackup
 	}

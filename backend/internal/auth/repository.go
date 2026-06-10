@@ -259,6 +259,9 @@ func (r *Repository) ClaimLegacyEntries(ctx context.Context, userID int64) error
 	return err
 }
 
+// DeleteAccount removes the user-owned database rows and returns file paths
+// that need storage cleanup after commit. The users lock keeps owner deletion
+// checks and final-user setup reopening consistent with concurrent requests.
 func (r *Repository) DeleteAccount(ctx context.Context, userID int64) (AccountDeletionResult, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -286,6 +289,7 @@ func (r *Repository) DeleteAccount(ctx context.Context, userID int64) (AccountDe
 		return AccountDeletionResult{}, ErrOwnerAccountRequired
 	}
 
+	// Cascading deletes remove image metadata, so capture storage paths first.
 	paths, err := accountImageFilePaths(ctx, tx, userID)
 	if err != nil {
 		return AccountDeletionResult{}, err

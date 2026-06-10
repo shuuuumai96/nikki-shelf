@@ -75,6 +75,8 @@ func (r *Repository) Memories(ctx context.Context, userID int64, filter MemoryFi
 	}
 	query += " GROUP BY e.id, e.entry_date, e.title, e.body, e.mood, e.tags_json, e.updated_at"
 	seed := appendArg(&args, filter.Date)
+	// The selected date seeds a stable pseudo-random order for one day's memory
+	// shelf, while letting the shelf change naturally from day to day.
 	query += " ORDER BY md5(e.id::text || ':' || " + seed + ")"
 	query += " LIMIT " + appendArg(&args, filter.Limit)
 

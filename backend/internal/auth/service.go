@@ -358,6 +358,8 @@ func (s *Service) Login(ctx context.Context, input Credentials) (SessionResult, 
 	return s.startSession(ctx, row)
 }
 
+// DeleteCurrentAccount requires an explicit username/password confirmation
+// before the destructive account removal begins.
 func (s *Service) DeleteCurrentAccount(ctx context.Context, userID int64, input DeleteAccountInput) (AccountDeletionResult, error) {
 	if inProgress, err := s.SetupRestoreInProgress(ctx); err != nil {
 		return AccountDeletionResult{}, err
@@ -388,6 +390,8 @@ func (s *Service) DeleteCurrentAccount(ctx context.Context, userID int64, input 
 	if err != nil {
 		return AccountDeletionResult{}, err
 	}
+	// The account is already inaccessible; file cleanup is best-effort so a
+	// storage hiccup does not roll back the privacy boundary.
 	if s.accountFiles != nil {
 		for _, path := range result.ImageFilePaths {
 			if err := s.accountFiles.Delete(ctx, path); err != nil {

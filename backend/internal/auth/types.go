@@ -23,7 +23,9 @@ type DeleteAccountInput struct {
 }
 
 type AccountDeletionResult struct {
+	// ImageFilePaths are deleted after the account rows are no longer reachable.
 	ImageFilePaths []string
+	// RemainingUsers lets callers distinguish ordinary logout from setup reopen.
 	RemainingUsers int
 }
 

@@ -171,6 +171,8 @@ export function useEntryImageUploads(options: {
       item.upload = upload;
       const image = await upload.promise;
 
+      // Uploads may finish after removal or navigation. Guard both local state
+      // markers before attaching a late success to the current editor.
       if (
         !item.active ||
         !uploadImages.value.some((current) => current.id === item.id)

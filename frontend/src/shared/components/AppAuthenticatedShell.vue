@@ -144,6 +144,8 @@ function navigationSourceLabel(source: EntryOpenSource) {
 }
 
 function updateMemoryJourney(source: EntryOpenSource) {
+  // Memory navigation keeps a temporary return path only while the user walks
+  // adjacent days from a memory result.
   const viewingToday = props.store.activeDate === todayISO();
   if (source === "memory") {
     memoryJourneyActive.value = !viewingToday;

@@ -102,6 +102,8 @@ func Run(ctx context.Context) error {
 	protected.Use(auth.Require(authService))
 	protected.Use(auth.CSRF(authService))
 	imageHandler := images.NewHandler(imageService)
+	// Legacy /uploads URLs stay behind auth; the handler resolves each name
+	// through stored image metadata so ownership checks remain centralized.
 	uploads := server.Group("/uploads", auth.Require(authService))
 	imageHandler.RegisterUploads(uploads)
 
