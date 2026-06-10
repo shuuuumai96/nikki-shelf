@@ -115,6 +115,7 @@ async function logout() {
 async function deleteAccount(input: DeleteAccountInput) {
   await auth.deleteAccount(input);
   store.clear();
+  // Deleting the final user reopens setup, so route only after refreshing it.
   await refreshSetupStatus();
   if (setupStatus.value?.needsSetup) {
     replacePath("/setup");

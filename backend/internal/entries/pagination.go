@@ -13,6 +13,8 @@ const (
 )
 
 type entryCursor struct {
+	// These compact JSON keys are an API compatibility boundary. The fields
+	// mirror ListPage's ORDER BY entry_date DESC, id DESC.
 	EntryDate string `json:"d"`
 	ID        int64  `json:"id"`
 }

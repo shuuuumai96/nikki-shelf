@@ -27,6 +27,8 @@ export function useDiaryNavigation(options: {
   async function prepareDiaryNavigation(source: string) {
     const { diaryEditor, store, t } = options;
 
+    // Failed and conflicting saves are blockers because leaving the date can
+    // hide unsaved local text behind a different entry.
     if (hasBlockingSaveStatus(store.saveStatus)) {
       navigationMessage.value = blockedNavigationMessage(store.saveStatus, t);
       return false;

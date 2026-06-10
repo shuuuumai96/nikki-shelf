@@ -17,6 +17,8 @@ import { todayISO } from "../utils/date";
 const EntryMemorySearch = defineAsyncComponent({
   delay: 0,
   loader: async () => {
+    // Let the first writing surface paint before loading the heavier search
+    // rail, which is helpful on cold mobile sessions.
     await afterNextPaint();
     return import("../../features/entries/components/EntryMemorySearch.vue");
   },
