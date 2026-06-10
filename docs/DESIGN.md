@@ -8,6 +8,8 @@ The primary experience is PC-browser diary writing: text-first daily records, mo
 
 Smartphone support is secondary: reading, light edits, and limited installability. Nikki should not be shaped around mobile-first capture or photo-library workflows.
 
+Nikki may include small diary-centered review aids when explicitly approved. The current memory shelf is one such bounded feature: it helps revisit older entries without becoming analytics, coaching, recommendations, or a photo library.
+
 ## 2. Release Scope
 
 Supported:
@@ -18,6 +20,8 @@ Supported:
 - text diary
 - tags
 - moods
+- basic past-entry search
+- random memory shelf with mood exclusions
 - normal autosave
 - backup and restore
 - desktop-supported image attachments
@@ -38,6 +42,7 @@ Unsupported:
 - public SaaS or multi-tenant hosting
 - sharing
 - AI features
+- advanced reflection, analytics, or recommendation features
 
 ## 3. Design Principles
 
@@ -58,6 +63,7 @@ Unsupported:
 - PC-browser writing for daily diary records
 - single-tab autosave with stale-version fallback
 - tags, moods, and simple date-based organization
+- basic search and a bounded random memory shelf for revisiting older entries
 - desktop-supported image attachments
 - missing-image visibility and image consistency cleanup
 - app-level backup archive
@@ -69,9 +75,9 @@ Unsupported:
 
 These are roadmap candidates only and require explicit approval before implementation:
 
-- archive and reading mode improvements
-- search and retrieval
-- lightweight reflection that stays close to diary review
+- additional archive and reading mode improvements
+- search and retrieval expansion beyond the current basic search and memory shelf
+- additional lightweight reflection that stays close to diary review
 - public OSS readiness work
 
 ### Explicitly Not a Goal
@@ -112,6 +118,8 @@ The frontend is built from `frontend/` and served by nginx in the frontend conta
 - Edit diary entry: the user edits an existing entry and sends the current entry version.
 - Normal autosave: the frontend saves routine single-tab edits through the entry update API.
 - Conflict detection fallback: stale updates return `409`; the editor keeps a recovery draft that the user can review, copy, or restore after loading the server version.
+- Past-entry search: the user searches older diary records by text and simple diary-oriented filters.
+- Memory shelf: the Today screen can show a small set of older entries selected from the signed-in user's own diary. The shelf excludes today's entry, can be collapsed locally, and can be disabled or filtered by mood from Settings.
 - Desktop image attachment: the user attaches supported image files to an entry from a desktop-supported flow.
 - Missing image display: if image metadata exists but the file is missing, the UI surfaces a missing-image state.
 - Backup creation: the application can produce a backup archive through Settings or `GET /api/export/backup`.
@@ -170,11 +178,12 @@ Operators are responsible for deployment security, backups, restore testing, and
 - no photo library features
 - local draft is a convenience, not a backup
 - desktop image attachments only
+- no advanced reflection, analytics, or recommendation system
 
 ## 12. Future Work Policy
 
 Frozen features must not be resumed without a new release decision.
 
-Future work must be justified by diary value, data safety, operational simplicity, and the PC-browser writing experience. Mobile image upload, offline-first PWA behavior, rich inline image editing, robust multi-tab editing, search, and lightweight reflection require separate release gates.
+Future work must be justified by diary value, data safety, operational simplicity, and the PC-browser writing experience. Mobile image upload, offline-first PWA behavior, rich inline image editing, robust multi-tab editing, search/retrieval expansion, and reflection beyond the current bounded memory shelf require separate release gates.
 
 See [FROZEN_SCOPE.md](FROZEN_SCOPE.md) and [ROADMAP.md](ROADMAP.md).

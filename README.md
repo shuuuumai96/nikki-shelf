@@ -27,6 +27,8 @@ Public exposure requires careful production configuration, access control, and b
 - title and body text
 - tags
 - moods
+- basic past-entry search
+- random memory shelf for revisiting older entries
 - normal autosave for single-tab writing
 - stale-version conflict fallback
 - desktop-supported image attachments
@@ -54,6 +56,7 @@ Public exposure requires careful production configuration, access control, and b
 - statistics expansion
 - broad visual redesign
 - advanced Markdown/editor behavior
+- advanced reflection, analytics, or recommendation features
 
 See [docs/FROZEN_SCOPE.md](docs/FROZEN_SCOPE.md).
 
@@ -62,8 +65,8 @@ See [docs/FROZEN_SCOPE.md](docs/FROZEN_SCOPE.md).
 These themes describe direction, not a commitment that the features already exist.
 
 - **PC Browser Writing**: keep the desktop browser writing cockpit calm, fast, and reliable.
-- **Archive & Retrieval**: make older records easier to read, search, and recover when explicitly approved.
-- **Lightweight Reflection**: support modest review and reflection without turning Nikki into analytics, coaching, or AI-first software.
+- **Archive & Retrieval**: make older records easier to read, search, revisit, and recover while keeping retrieval diary-oriented.
+- **Lightweight Reflection**: support modest review and reflection through bounded diary-centered surfaces, without turning Nikki into analytics, coaching, or AI-first software.
 - **Recoverable Self-hosted Data**: keep backup, restore, consistency checks, and operator clarity central.
 - **Public OSS Readiness**: prepare documentation, contribution expectations, release process, and security handling for a public repository.
 - **Installable Web App**: keep installability narrow: manifest metadata, app icons, standalone display, mobile web app meta tags, and basic service-worker app-shell caching. Offline writing, background sync, push notifications, and offline-first behavior remain out of scope unless separately approved.
@@ -202,6 +205,20 @@ ENV_FILE=.env.production ./scripts/backup-production.sh
 Backups can contain private diary text, images, password hashes, and other operational data. Encrypted backup artifacts are recommended before copying backups to external storage.
 
 See [docs/BACKUP_RESTORE.md](docs/BACKUP_RESTORE.md).
+
+## Search and Memory Shelf
+
+Nikki includes basic search for past entries and a small random memory shelf on
+the Today screen. The memory shelf selects earlier entries for the signed-in
+user only, never today's entry, and only entries that have a title, body, or
+attached image.
+
+The memory shelf is not a photo library, recommendation system, statistics
+surface, or AI feature. It is a lightweight diary review aid. Users can collapse
+the shelf in the Today view without disabling the feature. The Settings screen
+can disable the shelf and can hide selected moods from memory results. The
+default hidden moods are `tired` and `sad`; this preference is stored in the
+browser's local storage.
 
 ## Image Attachments and Cleanup
 
