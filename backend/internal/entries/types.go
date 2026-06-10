@@ -88,6 +88,28 @@ type SearchResponse struct {
 	Results []SearchResult `json:"results"`
 }
 
+type MemoryFilter struct {
+	Date         string
+	ExcludeMoods []string
+	Limit        int
+}
+
+type MemoryResponse struct {
+	Items []MemoryItem `json:"items"`
+}
+
+type MemoryItem struct {
+	ID         int64    `json:"id"`
+	EntryDate  string   `json:"entryDate"`
+	Title      string   `json:"title"`
+	Preview    string   `json:"preview"`
+	Mood       string   `json:"mood"`
+	Tags       []string `json:"tags"`
+	HasImage   bool     `json:"hasImage"`
+	ImageCount int      `json:"imageCount"`
+	UpdatedAt  string   `json:"updatedAt"`
+}
+
 type SearchResult struct {
 	ID         int64    `json:"id"`
 	EntryDate  string   `json:"entryDate"`

@@ -211,3 +211,43 @@ func TestSearchPreviewCentersQuery(t *testing.T) {
 		t.Fatalf("preview length = %d, want compact", len([]rune(got)))
 	}
 }
+
+func TestMemoryFilterValidationAndClauses(t *testing.T) {
+	filter, err := normalizeMemoryFilter(MemoryFilter{
+		Date:         " 2026-06-10 ",
+		ExcludeMoods: []string{"sad", " sad ", "", "tired"},
+		Limit:        500,
+	})
+	if err != nil {
+		t.Fatalf("normalizeMemoryFilter() error = %v", err)
+	}
+
+	clauses, args := buildMemoryClauses(42, filter)
+	wantClauses := []string{
+		"e.user_id = $1",
+		"e.entry_date < $2",
+		"(NULLIF(BTRIM(e.title), '') IS NOT NULL OR NULLIF(BTRIM(e.body), '') IS NOT NULL OR EXISTS (SELECT 1 FROM images memory_images WHERE memory_images.entry_id = e.id))",
+		"e.mood NOT IN ($3, $4)",
+	}
+	wantArgs := []any{int64(42), "2026-06-10", "sad", "tired"}
+
+	if !reflect.DeepEqual(clauses, wantClauses) {
+		t.Fatalf("clauses = %#v, want %#v", clauses, wantClauses)
+	}
+	if !reflect.DeepEqual(args, wantArgs) {
+		t.Fatalf("args = %#v, want %#v", args, wantArgs)
+	}
+	if filter.Limit != maxMemoryLimit {
+		t.Fatalf("limit = %d, want %d", filter.Limit, maxMemoryLimit)
+	}
+}
+
+func TestMemoryFilterRejectsInvalidMood(t *testing.T) {
+	_, err := normalizeMemoryFilter(MemoryFilter{
+		Date:         "2026-06-10",
+		ExcludeMoods: []string{"sleepy"},
+	})
+	if err != ErrInvalidInput {
+		t.Fatalf("normalizeMemoryFilter() error = %v, want %v", err, ErrInvalidInput)
+	}
+}

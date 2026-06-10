@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
+import { todayISO } from "../../../shared/utils/date";
 import type { UploadImageRequest } from "../api";
 import type { EntrySurfaceMode } from "../composables/useEntrySurfaceMode";
 import type { Entry, EntryInput, SaveStatus } from "../types";
 import DiaryEditor from "./DiaryEditor.vue";
 import EntryReader from "./EntryReader.vue";
+import MemoryShelf from "./MemoryShelf.vue";
 
-defineProps<{
+const props = defineProps<{
   activeDate: string;
   entry: Entry | null;
   entrySurfaceMode: EntrySurfaceMode;
@@ -14,6 +16,7 @@ defineProps<{
   saveError: string;
   saveStatus: SaveStatus;
   saving: boolean;
+  showReturnToday: boolean;
   tags: string[];
   uploadImage: (payload: {
     input: EntryInput;
@@ -28,13 +31,16 @@ const emit = defineEmits<{
   deleteImage: [imageId: number];
   edit: [];
   navigateDate: [date: string];
+  openMemory: [date: string];
   reloadEntry: [];
+  returnToday: [];
 }>();
 
 const diaryEditor = ref<{
   flushPendingAutosave: () => boolean;
   toggleFocusMode: () => void;
 } | null>(null);
+const showMemoryShelf = computed(() => props.activeDate === todayISO());
 
 function flushPendingAutosave() {
   return diaryEditor.value?.flushPendingAutosave() ?? false;
@@ -56,8 +62,10 @@ defineExpose({
     :entry="entry"
     :active-date="activeDate"
     :is-navigating="saving || saveStatus === 'saving'"
+    :show-return-today="showReturnToday"
     @edit="emit('edit')"
     @navigate-date="emit('navigateDate', $event)"
+    @return-today="emit('returnToday')"
   />
 
   <DiaryEditor
@@ -76,5 +84,14 @@ defineExpose({
     @delete-image="emit('deleteImage', $event)"
     @navigate-date="emit('navigateDate', $event)"
     @reload-entry="emit('reloadEntry')"
-  />
+  >
+    <template #after-attachments>
+      <MemoryShelf
+        v-if="showMemoryShelf"
+        embedded
+        :active-date="activeDate"
+        @select-date="emit('openMemory', $event)"
+      />
+    </template>
+  </DiaryEditor>
 </template>

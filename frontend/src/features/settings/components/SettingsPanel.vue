@@ -1,8 +1,15 @@
 <script setup lang="ts">
 import { Download, LogOut } from "lucide-vue-next";
+import { ref } from "vue";
 import { useI18n } from "vue-i18n";
 import LanguageSelect from "../../../shared/components/LanguageSelect.vue";
 import type { AuthUser } from "../../auth/types";
+import {
+  readMemoryPreferences,
+  writeMemoryPreferences,
+} from "../../entries/memory-preferences";
+import { moodOrder, moodSpecs } from "../../entries/moods";
+import type { MoodKey } from "../../entries/types";
 
 defineProps<{
   user: AuthUser;
@@ -14,6 +21,35 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
+const memoryPreferences = ref(readMemoryPreferences());
+
+function setMemoryEnabled(event: Event) {
+  const target = event.target as HTMLInputElement;
+  updateMemoryPreferences({ enabled: target.checked });
+}
+
+function toggleExcludedMood(mood: MoodKey, event: Event) {
+  const target = event.target as HTMLInputElement;
+  const excluded = new Set(memoryPreferences.value.excludedMoods);
+  if (target.checked) {
+    excluded.add(mood);
+  } else {
+    excluded.delete(mood);
+  }
+  updateMemoryPreferences({
+    excludedMoods: moodOrder.filter((key) => excluded.has(key)),
+  });
+}
+
+function updateMemoryPreferences(
+  next: Partial<typeof memoryPreferences.value>,
+) {
+  memoryPreferences.value = {
+    ...memoryPreferences.value,
+    ...next,
+  };
+  writeMemoryPreferences(memoryPreferences.value);
+}
 </script>
 
 <template>
@@ -39,6 +75,34 @@ const { t } = useI18n();
     <div class="settings-block">
       <h2>{{ t("settings.language") }}</h2>
       <LanguageSelect />
+    </div>
+
+    <div class="settings-block">
+      <h2>{{ t("settings.memories") }}</h2>
+      <label class="toggle-row">
+        <input
+          type="checkbox"
+          :checked="memoryPreferences.enabled"
+          @change="setMemoryEnabled"
+        />
+        <span>{{ t("settings.memoriesEnabled") }}</span>
+      </label>
+      <div class="mood-filter-group">
+        <p>{{ t("settings.memoriesExcludedMoods") }}</p>
+        <div class="mood-filter-list">
+          <label v-for="mood in moodOrder" :key="mood" class="mood-filter">
+            <input
+              type="checkbox"
+              :checked="memoryPreferences.excludedMoods.includes(mood)"
+              @change="toggleExcludedMood(mood, $event)"
+            />
+            <span>
+              <component :is="moodSpecs[mood].icon" :size="14" />
+              {{ t(moodSpecs[mood].labelKey) }}
+            </span>
+          </label>
+        </div>
+      </div>
     </div>
 
     <div class="settings-block">
@@ -115,6 +179,57 @@ h2 {
   text-decoration: none;
 }
 
+.toggle-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-text);
+  font-size: 14px;
+}
+
+.toggle-row input,
+.mood-filter input {
+  width: 15px;
+  height: 15px;
+}
+
+.mood-filter-group {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.mood-filter-group p {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.mood-filter-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mood-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text-soft);
+  padding: 7px 9px;
+  font-size: 13px;
+}
+
+.mood-filter span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
 @media (max-width: 480px) {
   h1 {
     margin-bottom: 22px;
@@ -129,6 +244,11 @@ h2 {
   .account-card {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .mood-filter-list {
+    display: grid;
+    grid-template-columns: 1fr;
   }
 }
 </style>

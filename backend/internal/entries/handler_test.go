@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -37,6 +38,17 @@ func TestHandlerSearchRequiresAuth(t *testing.T) {
 
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/api/entries/search?q=tea", nil)
+	server.ServeHTTP(response, request)
+
+	assertStatus(t, response, http.StatusUnauthorized)
+	assertError(t, response, auth.ErrUnauthorized.Error())
+}
+
+func TestHandlerMemoriesRequiresAuth(t *testing.T) {
+	server := newEntryTestServer(t, &scriptDB{}, true)
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/entries/memories?date=2026-06-10", nil)
 	server.ServeHTTP(response, request)
 
 	assertStatus(t, response, http.StatusUnauthorized)
@@ -609,6 +621,62 @@ func TestHandlerSearchNoActiveFilterReturnsEmptyWithoutQuery(t *testing.T) {
 	}
 	if len(script.queryLog()) != 0 {
 		t.Fatalf("query count = %d, want 0", len(script.queryLog()))
+	}
+}
+
+func TestHandlerMemories(t *testing.T) {
+	script := &scriptDB{
+		queries: []queryResult{
+			rowsResult(searchColumns, [][]driver.Value{
+				searchRowValues(30, "2026-06-01", "Found shelf", "A quiet earlier entry", "calm", `["home"]`, 1),
+			}),
+		},
+	}
+	server := newEntryTestServer(t, script, false)
+
+	response := httptest.NewRecorder()
+	request := authedRequest(http.MethodGet, "/api/entries/memories?date=2026-06-10&excludeMoods=sad,tired&limit=5", nil)
+	server.ServeHTTP(response, request)
+
+	assertStatus(t, response, http.StatusOK)
+	var body MemoryResponse
+	decodeResponse(t, response, &body)
+	if len(body.Items) != 1 {
+		t.Fatalf("len(items) = %d, want 1", len(body.Items))
+	}
+	item := body.Items[0]
+	if item.ID != 30 || item.EntryDate != "2026-06-01" || item.Mood != "calm" || !item.HasImage {
+		t.Fatalf("memory item = %#v", item)
+	}
+	if item.Preview == "" || item.ImageCount != 1 || item.Tags[0] != "home" {
+		t.Fatalf("memory metadata = %#v", item)
+	}
+
+	logged := script.queryLog()[0]
+	if !strings.Contains(logged.query, "e.entry_date < $2") || !strings.Contains(logged.query, "ORDER BY md5") {
+		t.Fatalf("memory query = %s", logged.query)
+	}
+	wantArgs := []any{int64(42), "2026-06-10", "sad", "tired", "2026-06-10", int64(5)}
+	if !reflect.DeepEqual(logged.args, wantArgs) {
+		t.Fatalf("memory args = %#v, want %#v", logged.args, wantArgs)
+	}
+}
+
+func TestHandlerMemoriesRejectsInvalidInput(t *testing.T) {
+	for _, target := range []string{
+		"/api/entries/memories?date=2026-06-99",
+		"/api/entries/memories?date=2026-06-10&excludeMoods=sleepy",
+	} {
+		t.Run(target, func(t *testing.T) {
+			server := newEntryTestServer(t, &scriptDB{}, false)
+
+			response := httptest.NewRecorder()
+			request := authedRequest(http.MethodGet, target, nil)
+			server.ServeHTTP(response, request)
+
+			assertStatus(t, response, http.StatusBadRequest)
+			assertErrorKind(t, response, "entries.invalid_input")
+		})
 	}
 }
 

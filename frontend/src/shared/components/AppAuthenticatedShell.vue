@@ -43,7 +43,11 @@ const { t } = useI18n();
 const view = ref("today");
 const entriesMode = ref<"list" | "archive">("list");
 const todayView = ref<DiaryEditorHandle | null>(null);
+const memoryJourneyActive = ref(false);
 const selectedId = computed(() => props.store.activeEntry?.id);
+const showReturnToToday = computed(
+  () => memoryJourneyActive.value && props.store.activeDate !== todayISO(),
+);
 
 const { entrySurfaceMode, resolveEntrySurfaceMode, setEntrySurfaceMode } =
   useEntrySurfaceMode();
@@ -79,6 +83,7 @@ async function selectDate(date: string, source: EntryOpenSource = "calendar") {
   const lookup = await props.store.loadEntryByDate(date);
   if (lookup && !props.store.error) {
     setEntrySurfaceMode(props.store.activeDate, lookup, source);
+    updateMemoryJourney(source);
     view.value = "today";
     navigationMessage.value = "";
   }
@@ -129,10 +134,26 @@ function navigationSourceLabel(source: EntryOpenSource) {
     list: t("entries.sourceList"),
     archive: t("entries.sourceArchive"),
     search: t("entries.sourceSearch"),
+    memory: t("entries.sourceMemory"),
     edit: t("entries.sourceEdit"),
   };
 
   return labels[source];
+}
+
+function updateMemoryJourney(source: EntryOpenSource) {
+  const viewingToday = props.store.activeDate === todayISO();
+  if (source === "memory") {
+    memoryJourneyActive.value = !viewingToday;
+    return;
+  }
+
+  if (source === "adjacent") {
+    memoryJourneyActive.value = memoryJourneyActive.value && !viewingToday;
+    return;
+  }
+
+  memoryJourneyActive.value = false;
 }
 
 function preloadNavigationViews() {
@@ -170,13 +191,16 @@ function preloadNavigationViews() {
         :save-error="store.saveError"
         :save-status="store.saveStatus"
         :saving="store.saving"
+        :show-return-today="showReturnToToday"
         :tags="store.tags"
         :upload-image="uploadDiaryImage"
         @autosave="autosaveDiary"
         @delete="store.removeActive"
         @delete-image="store.removeImage"
         @edit="editActiveEntry"
+        @open-memory="selectDate($event, 'memory')"
         @navigate-date="navigateDiaryDay"
+        @return-today="selectToday"
         @reload-entry="store.reloadActive"
       />
 

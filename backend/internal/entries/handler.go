@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 
@@ -25,6 +26,7 @@ func NewHandler(service *Service) *Handler {
 func (h *Handler) Register(api *echo.Group) {
 	api.GET("/entries", h.list)
 	api.GET("/entries/search", h.search)
+	api.GET("/entries/memories", h.memories)
 	api.POST("/entries", h.create)
 	api.GET("/entries/:id", h.get)
 	api.PUT("/entries/:id", h.update)
@@ -87,6 +89,24 @@ func (h *Handler) search(c echo.Context) error {
 	}
 
 	return httpx.JSON(c, http.StatusOK, results)
+}
+
+func (h *Handler) memories(c echo.Context) error {
+	userID, ok := userID(c)
+	if !ok {
+		return unauthorized(c)
+	}
+
+	memories, err := h.service.Memories(c.Request().Context(), userID, MemoryFilter{
+		Date:         c.QueryParam("date"),
+		ExcludeMoods: splitQueryList(c.QueryParam("excludeMoods")),
+		Limit:        queryInt(c.QueryParam("limit"), 0),
+	})
+	if err != nil {
+		return entryError(c, err)
+	}
+
+	return httpx.JSON(c, http.StatusOK, memories)
 }
 
 func (h *Handler) create(c echo.Context) error {
@@ -237,6 +257,13 @@ func queryInt(value string, fallback int) int {
 		return fallback
 	}
 	return parsed
+}
+
+func splitQueryList(value string) []string {
+	if value == "" {
+		return nil
+	}
+	return strings.Split(value, ",")
 }
 
 func nextLink(c echo.Context, cursor string, perPage int) string {
