@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Ellipsis } from "lucide-vue-next";
+import { Ellipsis, Undo2 } from "lucide-vue-next";
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import {
@@ -16,11 +16,13 @@ const props = defineProps<{
   entry: Entry;
   activeDate: string;
   isNavigating?: boolean;
+  showReturnToday?: boolean;
 }>();
 
 const emit = defineEmits<{
   edit: [];
   navigateDate: [date: string];
+  returnToday: [];
 }>();
 
 const { locale, t } = useI18n();
@@ -83,6 +85,17 @@ function onKeydown(event: KeyboardEvent) {
 <template>
   <article class="reader entry-surface ui-page">
     <header class="entry-surface__chrome">
+      <button
+        v-if="showReturnToday"
+        type="button"
+        class="entry-surface__return-today"
+        :disabled="isNavigating"
+        @click="emit('returnToday')"
+      >
+        <Undo2 :size="15" stroke-width="1.8" />
+        <span>{{ t("entries.returnToToday") }}</span>
+      </button>
+
       <div
         class="entry-surface__date-nav"
         :aria-label="t('entries.dateNavigation')"
@@ -230,6 +243,41 @@ function onKeydown(event: KeyboardEvent) {
   align-items: center;
   justify-content: center;
   gap: 14px;
+}
+
+.entry-surface__return-today {
+  display: inline-flex;
+  grid-column: 1;
+  width: max-content;
+  max-width: 100%;
+  min-height: 32px;
+  align-items: center;
+  justify-self: start;
+  gap: 7px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text-soft);
+  padding: 0 10px;
+  font-size: 13px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.entry-surface__return-today:hover:not(:disabled) {
+  border-color: var(--border-active);
+  background: var(--surface-hover);
+  color: var(--color-text);
+}
+
+.entry-surface__return-today:focus-visible {
+  outline: 1px solid color-mix(in srgb, var(--color-accent) 58%, transparent);
+  outline-offset: 2px;
+}
+
+.entry-surface__return-today:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .entry-surface__chrome-action {
@@ -431,6 +479,10 @@ function onKeydown(event: KeyboardEvent) {
     grid-template-columns: minmax(0, 1fr) auto;
   }
 
+  .entry-surface__return-today {
+    grid-column: 1 / -1;
+  }
+
   .entry-surface__date-nav {
     grid-column: 1;
     justify-content: flex-start;
@@ -451,6 +503,10 @@ function onKeydown(event: KeyboardEvent) {
     align-items: start;
     gap: 10px;
     margin-bottom: 18px;
+  }
+
+  .entry-surface__return-today {
+    min-height: 36px;
   }
 
   .entry-surface__date-nav {

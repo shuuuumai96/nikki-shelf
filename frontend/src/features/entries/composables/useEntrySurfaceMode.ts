@@ -12,6 +12,7 @@ export type EntryOpenSource =
   | "list"
   | "archive"
   | "search"
+  | "memory"
   | "edit";
 
 export function useEntrySurfaceMode() {

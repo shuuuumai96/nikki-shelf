@@ -656,6 +656,8 @@ function moodLabel(mood: MoodKey) {
       @remove-upload="removeUpload"
       @retry-upload="retryUpload"
     />
+
+    <slot v-if="!focusMode" name="after-attachments" />
   </section>
 </template>
 

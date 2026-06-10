@@ -165,6 +165,25 @@ func (s *Service) Search(ctx context.Context, userID int64, filter SearchFilter)
 	return SearchResponse{Results: results}, nil
 }
 
+func (s *Service) Memories(ctx context.Context, userID int64, filter MemoryFilter) (MemoryResponse, error) {
+	normalized, err := normalizeMemoryFilter(filter)
+	if err != nil {
+		return MemoryResponse{}, err
+	}
+
+	rows, err := s.repo.Memories(ctx, userID, normalized)
+	if err != nil {
+		return MemoryResponse{}, err
+	}
+
+	items := make([]MemoryItem, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, memoryItem(row))
+	}
+
+	return MemoryResponse{Items: items}, nil
+}
+
 func (s *Service) Tags(ctx context.Context, userID int64) ([]string, error) {
 	return s.repo.Tags(ctx, userID)
 }

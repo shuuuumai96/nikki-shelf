@@ -5,6 +5,7 @@ import App from "./App.vue";
 import type { AuthUser } from "./features/auth/types";
 import type { Entry, Stats } from "./features/entries/types";
 import type { SetupStatus } from "./features/setup/types";
+import { todayISO } from "./shared/utils/date";
 
 const mocks = vi.hoisted(() => ({
   authStore: null as any,
@@ -238,6 +239,44 @@ describe("App", () => {
     expect(wrapper.find('[data-testid="entry-reader"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="diary-editor"]').exists()).toBe(false);
   });
+
+  it("offers a direct return to today after opening a memory", async () => {
+    mocks.authStore.bootstrap = vi.fn(async () => {
+      mocks.authStore.user = user();
+      mocks.authStore.ready = true;
+    });
+    const memoryEntry = entry({ entryDate: "2026-02-09" });
+    mocks.entryStore.loadEntryByDate.mockImplementation(
+      async (date: string) => {
+        mocks.entryStore.activeDate = date;
+        if (date === memoryEntry.entryDate) {
+          mocks.entryStore.activeEntry = memoryEntry;
+          return { date, entry: memoryEntry, exists: true };
+        }
+        mocks.entryStore.activeEntry = null;
+        return { date, entry: null, exists: false };
+      },
+    );
+    const wrapper = mountApp();
+    await flushPromises();
+    mocks.entryStore.loadEntryByDate.mockClear();
+
+    await wrapper
+      .findComponent({ name: "TodayView" })
+      .vm.$emit("openMemory", memoryEntry.entryDate);
+    await flushPromises();
+
+    const reader = wrapper.findComponent({ name: "EntryReader" });
+    expect(reader.props("showReturnToday")).toBe(true);
+
+    await reader.vm.$emit("returnToday");
+    await flushPromises();
+
+    expect(mocks.entryStore.loadEntryByDate).toHaveBeenLastCalledWith(
+      todayISO(),
+    );
+    expect(wrapper.find('[data-testid="diary-editor"]').exists()).toBe(true);
+  });
 });
 
 function mountApp() {
@@ -280,7 +319,10 @@ function mountApp() {
         },
         EntryReader: {
           name: "EntryReader",
-          template: '<section data-testid="entry-reader"></section>',
+          props: ["showReturnToday"],
+          emits: ["returnToday"],
+          template:
+            '<section data-testid="entry-reader"><button v-if="showReturnToday" data-testid="return-today" @click="$emit(\'returnToday\')"></button></section>',
         },
         Filter: true,
         Search: true,

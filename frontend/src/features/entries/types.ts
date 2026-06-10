@@ -72,6 +72,12 @@ export type EntrySearchFilter = {
   offset?: string;
 };
 
+export type EntryMemoryFilter = {
+  date: string;
+  excludeMoods?: string;
+  limit?: string;
+};
+
 export type EntrySearchResult = {
   id: number;
   entryDate: string;
@@ -84,8 +90,24 @@ export type EntrySearchResult = {
   updatedAt: string;
 };
 
+export type EntryMemory = {
+  id: number;
+  entryDate: string;
+  title: string;
+  preview: string;
+  mood: MoodKey;
+  tags: string[];
+  hasImage: boolean;
+  imageCount: number;
+  updatedAt: string;
+};
+
 export type EntrySearchResponse = {
   results: EntrySearchResult[];
+};
+
+export type EntryMemoryResponse = {
+  items: EntryMemory[];
 };
 
 export type Stats = {

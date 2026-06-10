@@ -6,6 +6,8 @@ import type {
   EntryFilter,
   EntryImage,
   EntryInput,
+  EntryMemoryFilter,
+  EntryMemoryResponse,
   EntryPage,
   EntrySearchFilter,
   EntrySearchResponse,
@@ -25,7 +27,9 @@ export type UploadImageRequest = {
   abort: () => void;
 };
 
-function queryString(filter: EntryFilter | EntrySearchFilter): string {
+function queryString(
+  filter: EntryFilter | EntrySearchFilter | EntryMemoryFilter,
+): string {
   const params = new URLSearchParams();
   Object.entries(filter).forEach(([key, value]) => {
     if (value) {
@@ -46,6 +50,16 @@ export function searchEntries(
 ): Promise<EntrySearchResponse> {
   return request<EntrySearchResponse>(
     `/api/entries/search${queryString(filter)}`,
+    { signal },
+  );
+}
+
+export function listEntryMemories(
+  filter: EntryMemoryFilter,
+  signal?: AbortSignal,
+): Promise<EntryMemoryResponse> {
+  return request<EntryMemoryResponse>(
+    `/api/entries/memories${queryString(filter)}`,
     { signal },
   );
 }
