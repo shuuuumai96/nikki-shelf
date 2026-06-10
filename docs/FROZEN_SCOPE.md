@@ -1,6 +1,6 @@
 # Frozen Scope
 
-Nikki is released for personal daily use as a single-tab, self-hosted diary app with recoverable data and desktop-supported safe image attachments.
+Nikki is released for personal daily use as a single-tab, self-hosted diary app with recoverable data, basic search/retrieval, a bounded random memory shelf, and desktop-supported safe image attachments.
 
 The following areas are frozen until explicitly approved. Do not add, expand, or redesign these areas while stabilization, autosave safety, image lifecycle safety, backup/restore, and OSS readiness are still being clarified.
 
@@ -28,7 +28,9 @@ Simple installability is limited to web app manifest metadata, icons, theme colo
 
 ## Roadmap Candidate Boundary
 
-Lightweight reflection, search, archive/reading mode, and retrieval improvements may be future roadmap candidates. They should not be implemented until explicitly approved.
+Further lightweight reflection, search expansion, archive/reading mode expansion, and retrieval improvements remain roadmap candidates. They should not be implemented until explicitly approved.
+
+The current Today-screen memory shelf is an approved bounded retrieval feature. It may show older entries from the signed-in user's own diary, supports mood exclusions, and can be collapsed locally. Do not expand it into analytics, recommendations, coaching, AI summaries, reminders, photo-library behavior, or statistics without a separate approval.
 
 ## Allowed Work
 
@@ -40,6 +42,7 @@ Lightweight reflection, search, archive/reading mode, and retrieval improvements
 - Improving image lifecycle safety.
 - Improving backup and restore.
 - Improving PC-browser daily writing reliability.
+- Maintaining the approved basic search and memory shelf behavior without broadening their scope.
 - Updating documentation to keep the frozen scope explicit.
 - OSS readiness documentation and process preparation.
 
@@ -58,4 +61,4 @@ Lightweight reflection, search, archive/reading mode, and retrieval improvements
 - New visual systems or broad UI redesign.
 - Advanced editor controls beyond the existing daily diary needs.
 - Photo management beyond safe attachment, deletion, backup, and restore.
-- Statistics, AI, sharing, reminders, search, reflection, or offline-first PWA expansion.
+- Statistics, AI, sharing, reminders, search/retrieval expansion, reflection beyond the current bounded memory shelf, or offline-first PWA expansion.

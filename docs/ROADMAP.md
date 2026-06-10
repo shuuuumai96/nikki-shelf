@@ -45,6 +45,8 @@ This roadmap is direction, not commitment. Items below describe possible product
 
 **Why it matters:** A diary becomes more valuable as its archive grows. Retrieval should support memory and continuity without turning Nikki into a PKM system.
 
+**Current status:** Nikki already includes basic past-entry search and a bounded Today-screen memory shelf for revisiting older entries. This roadmap item covers future expansion beyond those existing capabilities.
+
 **Non-goals:** Backlinks, graph views, advanced knowledge-base workflows, or global document management.
 
 **Risks:** Search can become broad and expensive; archive UI can become a second product surface; indexing decisions may affect privacy and backups.
@@ -61,6 +63,8 @@ This roadmap is direction, not commitment. Items below describe possible product
 **Goal:** Add modest reflection support that helps users review their own records.
 
 **Why it matters:** Reflection can make daily writing more useful while staying close to the diary's core purpose.
+
+**Current status:** The approved reflection surface is limited to the existing random memory shelf. Further reflection work requires separate approval.
 
 **Non-goals:** AI coaching, mental health diagnosis, gamified analytics, habit platforms, or statistics expansion for its own sake.
 

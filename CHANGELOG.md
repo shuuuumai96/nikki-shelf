@@ -6,6 +6,10 @@ This changelog follows a simple Keep a Changelog-style structure. Nikki has not 
 
 ## [Unreleased]
 
+### Added
+
+- Added a Today-screen memory shelf for revisiting older diary entries, with mood exclusions, collapse/expand behavior, and a direct return-to-Today flow after opening a memory.
+
 ### Fixed
 
 - Fixed production backup uploads-volume detection so Compose project names derived from deployment directories are handled automatically.
