@@ -1,5 +1,10 @@
 import { request } from "../../shared/api/client";
-import type { AuthConfig, AuthCredentials, AuthUser } from "./types";
+import type {
+  AuthConfig,
+  AuthCredentials,
+  AuthUser,
+  DeleteAccountInput,
+} from "./types";
 
 export function config(): Promise<AuthConfig> {
   return request<AuthConfig>("/api/auth/config");
@@ -21,6 +26,13 @@ export function login(input: AuthCredentials): Promise<AuthUser> {
 
 export function logout(): Promise<void> {
   return request<void>("/api/auth/logout", { method: "POST" });
+}
+
+export function deleteAccount(input: DeleteAccountInput): Promise<void> {
+  return request<void>("/api/auth/me", {
+    method: "DELETE",
+    body: JSON.stringify(input),
+  });
 }
 
 export function me(): Promise<AuthUser> {

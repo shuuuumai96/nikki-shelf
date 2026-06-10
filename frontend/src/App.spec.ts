@@ -81,6 +81,9 @@ describe("App", () => {
       logout: vi.fn(async () => {
         mocks.authStore.user = null;
       }),
+      deleteAccount: vi.fn(async () => {
+        mocks.authStore.user = null;
+      }),
       start: vi.fn(async (action: () => Promise<AuthUser>) => {
         mocks.authStore.user = await action();
         mocks.authStore.ready = true;
@@ -168,6 +171,36 @@ describe("App", () => {
     expect(mocks.entryStore.bootstrap).toHaveBeenCalledTimes(1);
     expect(wrapper.find('[data-testid="sidebar"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="diary-editor"]').exists()).toBe(true);
+  });
+
+  it("routes to setup after deleting the last account", async () => {
+    mocks.authStore.bootstrap = vi.fn(async () => {
+      mocks.authStore.user = user();
+      mocks.authStore.ready = true;
+    });
+    mocks.setupStatus.mockResolvedValue(setupStatus({ needsSetup: true }));
+    const wrapper = mountApp();
+    await flushPromises();
+
+    await wrapper
+      .findComponent({ name: "AppSidebar" })
+      .vm.$emit("update:modelValue", "settings");
+    await vi.dynamicImportSettled();
+    await flushPromises();
+    await wrapper
+      .findComponent({ name: "SettingsPanel" })
+      .vm.$emit("deleteAccount", {
+        username: "nikki",
+        password: "password123",
+      });
+    await flushPromises();
+
+    expect(mocks.authStore.deleteAccount).toHaveBeenCalledWith({
+      username: "nikki",
+      password: "password123",
+    });
+    expect(mocks.entryStore.clear).toHaveBeenCalledTimes(1);
+    expect(window.location.pathname).toBe("/setup");
   });
 
   it("shows the offline banner when the browser is offline", async () => {
@@ -328,6 +361,7 @@ function mountApp() {
         Search: true,
         SettingsPanel: {
           name: "SettingsPanel",
+          emits: ["deleteAccount"],
           template: '<section data-testid="settings-panel"></section>',
         },
         SetupPanel: {

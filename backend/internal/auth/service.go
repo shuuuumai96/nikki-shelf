@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
+	"log/slog"
 	"os/exec"
 	"regexp"
 	"strings"
@@ -29,6 +30,7 @@ type Service struct {
 	firstUserBootstrapToken string
 	restorePostgres         func(context.Context, string) error
 	uploadDir               string
+	accountFiles            accountFileDeleter
 	now                     func() time.Time
 }
 
@@ -44,12 +46,18 @@ type serviceRepository interface {
 	CreateUser(ctx context.Context, username string, passwordHash string, now time.Time) (UserRow, error)
 	CreateFirstOwner(ctx context.Context, username string, passwordHash string, now time.Time) (UserRow, error)
 	GetUserByUsername(ctx context.Context, username string) (UserRow, error)
+	GetUserByID(ctx context.Context, id int64) (UserRow, error)
 	CreateSession(ctx context.Context, userID int64, tokenHash string, csrfHash string, expiresAt time.Time, now time.Time) error
 	GetSessionByTokenHash(ctx context.Context, tokenHash string, now time.Time) (SessionRow, error)
 	UpdateSessionCSRF(ctx context.Context, tokenHash string, csrfHash string) error
 	DeleteSession(ctx context.Context, tokenHash string) error
 	DeleteExpiredSessions(ctx context.Context, now time.Time) error
 	ClaimLegacyEntries(ctx context.Context, userID int64) error
+	DeleteAccount(ctx context.Context, userID int64) (AccountDeletionResult, error)
+}
+
+type accountFileDeleter interface {
+	Delete(ctx context.Context, path string) error
 }
 
 type ServiceConfig struct {
@@ -59,6 +67,7 @@ type ServiceConfig struct {
 	DatabaseURL             string
 	UploadDir               string
 	PgRestorePath           string
+	AccountFiles            accountFileDeleter
 }
 
 func NewService(repo serviceRepository, configs ...ServiceConfig) *Service {
@@ -73,6 +82,7 @@ func NewService(repo serviceRepository, configs ...ServiceConfig) *Service {
 		firstUserBootstrapToken: strings.TrimSpace(cfg.FirstUserBootstrapToken),
 		restorePostgres:         pgRestoreRunner(cfg.DatabaseURL, cfg.PgRestorePath),
 		uploadDir:               cfg.UploadDir,
+		accountFiles:            cfg.AccountFiles,
 		now:                     time.Now,
 	}
 }
@@ -348,6 +358,46 @@ func (s *Service) Login(ctx context.Context, input Credentials) (SessionResult, 
 	return s.startSession(ctx, row)
 }
 
+func (s *Service) DeleteCurrentAccount(ctx context.Context, userID int64, input DeleteAccountInput) (AccountDeletionResult, error) {
+	if inProgress, err := s.SetupRestoreInProgress(ctx); err != nil {
+		return AccountDeletionResult{}, err
+	} else if inProgress {
+		return AccountDeletionResult{}, ErrRestoreInProgress
+	}
+
+	username, password, err := normalizeCredentials(Credentials{
+		Username: input.Username,
+		Password: input.Password,
+	})
+	if err != nil {
+		return AccountDeletionResult{}, err
+	}
+
+	row, err := s.repo.GetUserByID(ctx, userID)
+	if err != nil {
+		return AccountDeletionResult{}, err
+	}
+	if username != row.Username {
+		return AccountDeletionResult{}, ErrInvalidCredentials
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(row.PasswordHash), []byte(password)); err != nil {
+		return AccountDeletionResult{}, ErrInvalidCredentials
+	}
+
+	result, err := s.repo.DeleteAccount(ctx, userID)
+	if err != nil {
+		return AccountDeletionResult{}, err
+	}
+	if s.accountFiles != nil {
+		for _, path := range result.ImageFilePaths {
+			if err := s.accountFiles.Delete(ctx, path); err != nil {
+				slog.ErrorContext(ctx, "account image file deletion failed", slog.Int64("user_id", userID), slog.String("file_path", path), slog.String("error", err.Error()))
+			}
+		}
+	}
+	return result, nil
+}
+
 func (s *Service) UserByToken(ctx context.Context, token string) (User, error) {
 	if inProgress, err := s.SetupRestoreInProgress(ctx); err != nil {
 		return User{}, err
@@ -507,6 +557,7 @@ var errorSpecs = []struct {
 	{ErrInvalidBackup, 400, "setup.invalid_backup"},
 	{ErrRestoreConfirmationMissing, 400, "setup.invalid_input"},
 	{ErrInvalidSetupToken, 403, "setup.invalid_token"},
+	{ErrOwnerAccountRequired, 409, "auth.owner_account_required"},
 	{ErrRestoreInProgress, 503, "setup.restore_in_progress"},
 	{ErrRestoreCountMismatch, 500, "setup.restore_failed"},
 	{ErrRestoreFailed, 500, "setup.restore_failed"},

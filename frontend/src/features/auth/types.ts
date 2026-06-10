@@ -16,3 +16,8 @@ export type AuthCredentials = {
   username: string;
   password: string;
 };
+
+export type DeleteAccountInput = {
+  username: string;
+  password: string;
+};

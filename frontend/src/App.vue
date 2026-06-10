@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, onMounted, ref } from "vue";
 import { useAuthStore } from "./features/auth/store";
-import type { AuthCredentials } from "./features/auth/types";
+import type {
+  AuthCredentials,
+  DeleteAccountInput,
+} from "./features/auth/types";
 import { useEntryStore } from "./features/entries/store";
 import {
   createOwner as createSetupOwner,
@@ -109,6 +112,17 @@ async function logout() {
   await refreshSetupStatus();
 }
 
+async function deleteAccount(input: DeleteAccountInput) {
+  await auth.deleteAccount(input);
+  store.clear();
+  await refreshSetupStatus();
+  if (setupStatus.value?.needsSetup) {
+    replacePath("/setup");
+  } else {
+    replacePath("/");
+  }
+}
+
 async function refreshSetupStatus() {
   setupReady.value = false;
   setupError.value = "";
@@ -155,8 +169,10 @@ function replacePath(path: string) {
   <AppAuthenticatedShell
     v-else
     :auth-loading="auth.loading"
+    :auth-error="auth.error"
     :store="store"
     :user="auth.user"
+    @delete-account="deleteAccount"
     @logout="logout"
   />
 

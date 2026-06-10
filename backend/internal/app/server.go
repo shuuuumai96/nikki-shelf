@@ -51,6 +51,7 @@ func Run(ctx context.Context) error {
 		FirstUserBootstrapToken: cfg.FirstUserBootstrapToken,
 		DatabaseURL:             cfg.DatabaseURL,
 		UploadDir:               cfg.UploadDir,
+		AccountFiles:            imageStorage,
 	})
 	imageService := images.NewService(imageRepo, imageStorage, entryRepo, images.ServiceConfig{
 		Quota: images.QuotaConfig{

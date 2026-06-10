@@ -49,6 +49,7 @@ func (h *Handler) Register(api *echo.Group) {
 	api.POST("/auth/login", h.login)
 	api.POST("/auth/logout", h.logout, CSRF(h.service))
 	api.GET("/auth/me", h.me)
+	api.DELETE("/auth/me", h.deleteMe, Require(h.service), CSRF(h.service))
 	api.GET("/setup/status", h.setupStatus)
 	api.POST("/setup/owner", h.setupOwner)
 	api.POST("/setup/restore/verify", h.setupRestoreVerify)
@@ -243,6 +244,47 @@ func (h *Handler) logout(c echo.Context) error {
 
 	clearSessionCookie(c, h.cookieSecure)
 	logx.Event(c, "auth.logout_succeeded")
+	return httpx.NoContent(c)
+}
+
+func (h *Handler) deleteMe(c echo.Context) error {
+	user, ok := UserFromContext(c)
+	if !ok {
+		return httpx.ErrorWithKind(c, http.StatusUnauthorized, ErrUnauthorized.Error(), "auth.unauthorized")
+	}
+
+	input := DeleteAccountInput{}
+	if err := httpx.DecodeJSONWithLimit(c, &input, httpx.AuthJSONLimitBytes); err != nil {
+		if errors.Is(err, httpx.ErrRequestTooLarge) {
+			return httpx.ErrorWithKind(c, http.StatusRequestEntityTooLarge, "request JSON is too large", "request.too_large")
+		}
+		return httpx.ErrorWithKind(c, http.StatusBadRequest, "check the request JSON", "request.invalid_json")
+	}
+
+	rateKey := input.Username
+	if strings.TrimSpace(rateKey) == "" {
+		rateKey = user.Username
+	}
+	if h.rateLimiter != nil && !h.rateLimiter.Allow(c, rateKey) {
+		return rateLimitError(c)
+	}
+
+	result, err := h.service.DeleteCurrentAccount(c.Request().Context(), user.ID, input)
+	if err != nil {
+		if h.rateLimiter != nil {
+			h.rateLimiter.RecordFailure(c, rateKey)
+		}
+		return authError(c, err)
+	}
+	if h.rateLimiter != nil {
+		h.rateLimiter.RecordSuccess(c, rateKey)
+	}
+
+	clearSessionCookie(c, h.cookieSecure)
+	logx.Event(c, "auth.account_deleted",
+		slog.Int64("user_id", user.ID),
+		slog.Int("remaining_users", result.RemainingUsers),
+	)
 	return httpx.NoContent(c)
 }
 

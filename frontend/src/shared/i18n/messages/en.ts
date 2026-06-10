@@ -228,6 +228,15 @@ export default {
     memories: "Memories",
     memoriesEnabled: "Show random memories on Today",
     memoriesExcludedMoods: "Moods to hide",
+    deleteAccount: "Delete account",
+    deleteAccountBody:
+      "This permanently deletes your diary entries, images, and sessions. Export anything you need first.",
+    deleteAccountUsernameConfirm: "Enter your username to confirm",
+    deleteAccountPasswordConfirm: "Current password",
+    deleteAccountCancel: "Cancel",
+    deleteAccountSubmit: "Delete permanently",
+    deleteAccountUsernameMismatch: "The username does not match.",
+    deleteAccountPasswordRequired: "Enter your password.",
   },
   images: {
     photo: "Photo",
@@ -269,6 +278,8 @@ export default {
         unauthorized: "Log in to continue.",
         signup_closed: "Sign up is currently disabled.",
         username_exists: "This username is already in use.",
+        owner_account_required:
+          "The owner account cannot be deleted while other users remain.",
         csrf: "Check the request and try again.",
         rate_limited: "Too many authentication requests. Try again later.",
       },
