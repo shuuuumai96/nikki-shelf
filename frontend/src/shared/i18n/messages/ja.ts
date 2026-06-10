@@ -226,6 +226,15 @@ export default {
     memories: "回想",
     memoriesEnabled: "今日画面にランダム回想を表示",
     memoriesExcludedMoods: "表示しない気分",
+    deleteAccount: "アカウント削除",
+    deleteAccountBody:
+      "日記、画像、セッションを完全に削除します。必要なデータは先に書き出してください。",
+    deleteAccountUsernameConfirm: "確認のためユーザー名を入力",
+    deleteAccountPasswordConfirm: "現在のパスワード",
+    deleteAccountCancel: "キャンセル",
+    deleteAccountSubmit: "完全に削除",
+    deleteAccountUsernameMismatch: "ユーザー名が一致しません。",
+    deleteAccountPasswordRequired: "パスワードを入力してください。",
   },
   images: {
     photo: "写真",
@@ -267,6 +276,8 @@ export default {
         unauthorized: "ログインしてください。",
         signup_closed: "サインアップは現在停止されています。",
         username_exists: "このユーザー名はすでに使われています。",
+        owner_account_required:
+          "他のユーザーが残っている間はownerアカウントを削除できません。",
         csrf: "リクエストを確認して、もう一度試してください。",
         rate_limited:
           "認証リクエストが多すぎます。時間をおいて再試行してください。",

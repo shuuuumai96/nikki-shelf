@@ -800,6 +800,113 @@ func TestSetupRestoreInProgressBlocksProtectedRequests(t *testing.T) {
 	assertResponseKind(t, response, "setup.restore_in_progress")
 }
 
+func TestDeleteAccountAllowsLastOwnerAndUnlocksSetup(t *testing.T) {
+	repo := newFakeAuthRepo(0)
+	repo.setupLocked = true
+	owner := repo.addUser(t, "owner", "password123", RoleOwner)
+	repo.accountImageFilePaths = []string{"/uploads/one.jpg", "/uploads/two.jpg"}
+	deleter := &fakeAccountFileDeleter{}
+
+	result, err := NewService(repo, ServiceConfig{AccountFiles: deleter}).DeleteCurrentAccount(context.Background(), owner.ID, DeleteAccountInput{
+		Username: "owner",
+		Password: "password123",
+	})
+	if err != nil {
+		t.Fatalf("DeleteCurrentAccount() error = %v", err)
+	}
+
+	if result.RemainingUsers != 0 || repo.countUsers() != 0 {
+		t.Fatalf("remaining users = %d / %d, want 0", result.RemainingUsers, repo.countUsers())
+	}
+	if repo.locked() {
+		t.Fatal("setupLocked = true, want false after deleting last user")
+	}
+	if len(deleter.deleted) != 2 || deleter.deleted[0] != "/uploads/one.jpg" || deleter.deleted[1] != "/uploads/two.jpg" {
+		t.Fatalf("deleted files = %#v, want account image files", deleter.deleted)
+	}
+}
+
+func TestDeleteAccountRejectsOwnerWhenOtherUsersRemain(t *testing.T) {
+	repo := newFakeAuthRepo(0)
+	owner := repo.addUser(t, "owner", "password123", RoleOwner)
+	repo.addUser(t, "tester", "password123", RoleUser)
+	repo.accountImageFilePaths = []string{"/uploads/owner.jpg"}
+	deleter := &fakeAccountFileDeleter{}
+
+	_, err := NewService(repo, ServiceConfig{AccountFiles: deleter}).DeleteCurrentAccount(context.Background(), owner.ID, DeleteAccountInput{
+		Username: "owner",
+		Password: "password123",
+	})
+	if !errors.Is(err, ErrOwnerAccountRequired) {
+		t.Fatalf("DeleteCurrentAccount() error = %v, want %v", err, ErrOwnerAccountRequired)
+	}
+	if repo.countUsers() != 2 {
+		t.Fatalf("user count = %d, want 2", repo.countUsers())
+	}
+	if len(deleter.deleted) != 0 {
+		t.Fatalf("deleted files = %#v, want none", deleter.deleted)
+	}
+}
+
+func TestDeleteAccountAllowsRegularUserWhenOwnerRemains(t *testing.T) {
+	repo := newFakeAuthRepo(0)
+	repo.setupLocked = true
+	repo.addUser(t, "owner", "password123", RoleOwner)
+	user := repo.addUser(t, "tester", "password123", RoleUser)
+
+	result, err := NewService(repo).DeleteCurrentAccount(context.Background(), user.ID, DeleteAccountInput{
+		Username: "tester",
+		Password: "password123",
+	})
+	if err != nil {
+		t.Fatalf("DeleteCurrentAccount() error = %v", err)
+	}
+	if result.RemainingUsers != 1 || repo.countUsers() != 1 {
+		t.Fatalf("remaining users = %d / %d, want 1", result.RemainingUsers, repo.countUsers())
+	}
+	if !repo.locked() {
+		t.Fatal("setupLocked = false, want existing setup lock preserved")
+	}
+	if _, ok := repo.users["tester"]; ok {
+		t.Fatal("tester still exists after deletion")
+	}
+}
+
+func TestDeleteAccountRejectsWrongConfirmation(t *testing.T) {
+	repo := newFakeAuthRepo(0)
+	user := repo.addUser(t, "tester", "password123", RoleUser)
+
+	_, err := NewService(repo).DeleteCurrentAccount(context.Background(), user.ID, DeleteAccountInput{
+		Username: "wrong-user",
+		Password: "password123",
+	})
+	if !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("DeleteCurrentAccount() error = %v, want %v", err, ErrInvalidCredentials)
+	}
+	if repo.countUsers() != 1 {
+		t.Fatalf("user count = %d, want 1", repo.countUsers())
+	}
+}
+
+func TestDeleteAccountEndpointClearsSessionCookie(t *testing.T) {
+	repo := newFakeAuthRepo(0)
+	user := repo.addUser(t, "tester", "password123", RoleUser)
+	repo.sessions[hashToken("session-token")] = SessionRow{
+		User:     user,
+		CSRFHash: hashToken("csrf-token"),
+	}
+
+	response := performDeleteAccountRequest(NewService(repo), `{"username":"tester","password":"password123"}`)
+	if response.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want %d; body=%s", response.Code, http.StatusNoContent, response.Body.String())
+	}
+
+	cookies := response.Result().Cookies()
+	if len(cookies) == 0 || cookies[0].Name != SessionCookieName || cookies[0].MaxAge != -1 {
+		t.Fatalf("cookies = %#v, want cleared session cookie", cookies)
+	}
+}
+
 func TestLoginDoesNotRequireBootstrapToken(t *testing.T) {
 	repo := newFakeAuthRepo(1)
 	hash, err := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.DefaultCost)
@@ -1030,6 +1137,20 @@ func performSetupOwnerRequest(service *Service, body string) *httptest.ResponseR
 	return response
 }
 
+func performDeleteAccountRequest(service *Service, body string) *httptest.ResponseRecorder {
+	server := echo.New()
+	api := server.Group("/api")
+	NewHandler(service).Register(api)
+
+	request := httptest.NewRequest(http.MethodDelete, "/api/auth/me", strings.NewReader(body))
+	request.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	request.Header.Set("X-CSRF-Token", "csrf-token")
+	request.AddCookie(&http.Cookie{Name: SessionCookieName, Value: "session-token"})
+	response := httptest.NewRecorder()
+	server.ServeHTTP(response, request)
+	return response
+}
+
 func performSetupRestoreRequest(t *testing.T, service *Service, path string, token string, archive []byte, confirmRestore string) *httptest.ResponseRecorder {
 	t.Helper()
 
@@ -1189,16 +1310,17 @@ func sha256Sums(files map[string][]byte) []byte {
 }
 
 type fakeAuthRepo struct {
-	mu                sync.Mutex
-	count             int
-	entryCount        int
-	imageCount        int
-	nextID            int64
-	users             map[string]UserRow
-	sessions          map[string]SessionRow
-	claimedUser       int64
-	setupLocked       bool
-	restoreInProgress bool
+	mu                    sync.Mutex
+	count                 int
+	entryCount            int
+	imageCount            int
+	nextID                int64
+	users                 map[string]UserRow
+	sessions              map[string]SessionRow
+	accountImageFilePaths []string
+	claimedUser           int64
+	setupLocked           bool
+	restoreInProgress     bool
 }
 
 func newFakeAuthRepo(count int) *fakeAuthRepo {
@@ -1285,6 +1407,23 @@ func (r *fakeAuthRepo) createUserLocked(username string, passwordHash string, ro
 	return row, nil
 }
 
+func (r *fakeAuthRepo) addUser(t *testing.T, username string, password string, role string) UserRow {
+	t.Helper()
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		t.Fatalf("hash password: %v", err)
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	row, err := r.createUserLocked(username, string(hash), role, time.Now())
+	if err != nil {
+		t.Fatalf("add user: %v", err)
+	}
+	return row
+}
+
 func (r *fakeAuthRepo) CreateFirstOwner(_ context.Context, username string, passwordHash string, now time.Time) (UserRow, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -1312,6 +1451,18 @@ func (r *fakeAuthRepo) GetUserByUsername(_ context.Context, username string) (Us
 		return UserRow{}, ErrInvalidCredentials
 	}
 	return row, nil
+}
+
+func (r *fakeAuthRepo) GetUserByID(_ context.Context, id int64) (UserRow, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	for _, row := range r.users {
+		if row.ID == id {
+			return row, nil
+		}
+	}
+	return UserRow{}, ErrInvalidCredentials
 }
 
 func (r *fakeAuthRepo) CreateSession(_ context.Context, userID int64, tokenHash string, csrfHash string, _ time.Time, _ time.Time) error {
@@ -1369,6 +1520,45 @@ func (r *fakeAuthRepo) ClaimLegacyEntries(_ context.Context, userID int64) error
 	return nil
 }
 
+func (r *fakeAuthRepo) DeleteAccount(_ context.Context, userID int64) (AccountDeletionResult, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	var username string
+	var user UserRow
+	for candidate, row := range r.users {
+		if row.ID == userID {
+			username = candidate
+			user = row
+			break
+		}
+	}
+	if username == "" {
+		return AccountDeletionResult{}, ErrUnauthorized
+	}
+	if user.Role == RoleOwner && r.count > 1 {
+		return AccountDeletionResult{}, ErrOwnerAccountRequired
+	}
+
+	delete(r.users, username)
+	for tokenHash, session := range r.sessions {
+		if session.User.ID == userID {
+			delete(r.sessions, tokenHash)
+		}
+	}
+	if r.count > 0 {
+		r.count--
+	}
+	if r.count == 0 {
+		r.setupLocked = false
+		r.restoreInProgress = false
+	}
+	return AccountDeletionResult{
+		ImageFilePaths: append([]string{}, r.accountImageFilePaths...),
+		RemainingUsers: r.count,
+	}, nil
+}
+
 func (r *fakeAuthRepo) user(username string) UserRow {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -1417,4 +1607,13 @@ func (r *fakeAuthRepo) restoreFixture(entryCount int, imageCount int) {
 	if r.nextID < 2 {
 		r.nextID = 2
 	}
+}
+
+type fakeAccountFileDeleter struct {
+	deleted []string
+}
+
+func (d *fakeAccountFileDeleter) Delete(_ context.Context, path string) error {
+	d.deleted = append(d.deleted, path)
+	return nil
 }

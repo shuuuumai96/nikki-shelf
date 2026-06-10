@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import type { AuthUser } from "../../features/auth/types";
+import type { AuthUser, DeleteAccountInput } from "../../features/auth/types";
 import type { UploadImageRequest } from "../../features/entries/api";
 import TodayView from "../../features/entries/components/TodayView.vue";
 import {
@@ -30,12 +30,14 @@ const EntriesView = defineAsyncComponent(loadEntriesView);
 const SettingsPanel = defineAsyncComponent(loadSettingsPanel);
 
 const props = defineProps<{
+  authError?: string;
   authLoading: boolean;
   store: ReturnType<typeof useEntryStore>;
   user: AuthUser;
 }>();
 
 const emit = defineEmits<{
+  deleteAccount: [input: DeleteAccountInput];
   logout: [];
 }>();
 
@@ -231,8 +233,10 @@ function preloadNavigationViews() {
 
       <SettingsPanel
         v-else
+        :error="authError"
         :user="user"
         :loading="authLoading"
+        @delete-account="emit('deleteAccount', $event)"
         @logout="emit('logout')"
       />
     </main>

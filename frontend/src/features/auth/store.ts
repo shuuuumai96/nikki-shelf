@@ -5,8 +5,14 @@ import {
   localizedErrorMessage,
   setCSRFToken,
 } from "../../shared/api/client";
-import { login, logout, me, signup } from "./api";
-import type { AuthCredentials, AuthUser } from "./types";
+import {
+  deleteAccount as deleteAccountRequest,
+  login,
+  logout,
+  me,
+  signup,
+} from "./api";
+import type { AuthCredentials, AuthUser, DeleteAccountInput } from "./types";
 
 type AuthState = {
   user: AuthUser | null;
@@ -53,6 +59,20 @@ export const useAuthStore = defineStore("auth", {
       } finally {
         this.user = null;
         clearCSRFToken();
+        this.loading = false;
+      }
+    },
+    async deleteAccount(input: DeleteAccountInput) {
+      this.loading = true;
+      this.error = "";
+      try {
+        await deleteAccountRequest(input);
+        this.user = null;
+        clearCSRFToken();
+      } catch (error) {
+        this.error = errorMessage(error);
+        throw error;
+      } finally {
         this.loading = false;
       }
     },

@@ -259,6 +259,69 @@ func (r *Repository) ClaimLegacyEntries(ctx context.Context, userID int64) error
 	return err
 }
 
+func (r *Repository) DeleteAccount(ctx context.Context, userID int64) (AccountDeletionResult, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return AccountDeletionResult{}, err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.ExecContext(ctx, `LOCK TABLE users IN EXCLUSIVE MODE`); err != nil {
+		return AccountDeletionResult{}, err
+	}
+
+	row, err := scanUser(tx.QueryRowContext(ctx, `SELECT id, username, password_hash, role, created_at FROM users WHERE id = $1 FOR UPDATE`, userID))
+	if errors.Is(err, sql.ErrNoRows) {
+		return AccountDeletionResult{}, ErrUnauthorized
+	}
+	if err != nil {
+		return AccountDeletionResult{}, err
+	}
+
+	userCount := 0
+	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM users`).Scan(&userCount); err != nil {
+		return AccountDeletionResult{}, err
+	}
+	if row.Role == RoleOwner && userCount > 1 {
+		return AccountDeletionResult{}, ErrOwnerAccountRequired
+	}
+
+	paths, err := accountImageFilePaths(ctx, tx, userID)
+	if err != nil {
+		return AccountDeletionResult{}, err
+	}
+
+	result, err := tx.ExecContext(ctx, `DELETE FROM users WHERE id = $1`, userID)
+	if err != nil {
+		return AccountDeletionResult{}, err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return AccountDeletionResult{}, err
+	}
+	if affected == 0 {
+		return AccountDeletionResult{}, ErrUnauthorized
+	}
+
+	remaining := 0
+	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM users`).Scan(&remaining); err != nil {
+		return AccountDeletionResult{}, err
+	}
+	if remaining == 0 {
+		if err := upsertSettingInTx(ctx, tx, setupLockedKey, "false"); err != nil {
+			return AccountDeletionResult{}, err
+		}
+		if err := upsertSettingInTx(ctx, tx, setupRestoreInProgressKey, "false"); err != nil {
+			return AccountDeletionResult{}, err
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return AccountDeletionResult{}, err
+	}
+	return AccountDeletionResult{ImageFilePaths: paths, RemainingUsers: remaining}, nil
+}
+
 func (r *Repository) settingBool(ctx context.Context, key string) (bool, error) {
 	value := ""
 	err := r.db.QueryRowContext(ctx, `SELECT value FROM settings WHERE key = $1`, key).Scan(&value)
@@ -311,6 +374,35 @@ type txQueryer interface {
 
 type txExecutor interface {
 	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+}
+
+type txQueryExecutor interface {
+	txQueryer
+	txExecutor
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+}
+
+func accountImageFilePaths(ctx context.Context, tx txQueryExecutor, userID int64) ([]string, error) {
+	rows, err := tx.QueryContext(ctx, `
+		SELECT i.file_path
+		FROM images i
+		JOIN entries e ON e.id = i.entry_id
+		WHERE e.user_id = $1
+		ORDER BY i.id ASC`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	paths := []string{}
+	for rows.Next() {
+		path := ""
+		if err := rows.Scan(&path); err != nil {
+			return nil, err
+		}
+		paths = append(paths, path)
+	}
+	return paths, rows.Err()
 }
 
 func setupLockedInTx(ctx context.Context, tx txQueryer) (bool, error) {

@@ -17,6 +17,16 @@ type Credentials struct {
 	Password string `json:"password"`
 }
 
+type DeleteAccountInput struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+type AccountDeletionResult struct {
+	ImageFilePaths []string
+	RemainingUsers int
+}
+
 type SetupStatusResponse struct {
 	NeedsSetup         bool `json:"needsSetup"`
 	SetupLocked        bool `json:"setupLocked"`

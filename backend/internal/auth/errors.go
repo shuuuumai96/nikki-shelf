@@ -7,6 +7,7 @@ var (
 	ErrInvalidCredentials         = errors.New("check the username or password")
 	ErrInvalidInput               = errors.New("check the input")
 	ErrInvalidSetupToken          = errors.New("check the setup token")
+	ErrOwnerAccountRequired       = errors.New("owner account cannot be deleted while other users remain")
 	ErrRestoreConfirmationMissing = errors.New("confirm restore before continuing")
 	ErrRestoreCountMismatch       = errors.New("restored backup counts do not match")
 	ErrRestoreFailed              = errors.New("restore failed")
