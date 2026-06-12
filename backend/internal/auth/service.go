@@ -52,6 +52,7 @@ type serviceRepository interface {
 	UpdateSessionCSRF(ctx context.Context, tokenHash string, csrfHash string) error
 	DeleteSession(ctx context.Context, tokenHash string) error
 	DeleteExpiredSessions(ctx context.Context, now time.Time) error
+	UpdatePasswordAndDeleteSessions(ctx context.Context, userID int64, currentPasswordHash string, nextPasswordHash string) error
 	ClaimLegacyEntries(ctx context.Context, userID int64) error
 	DeleteAccount(ctx context.Context, userID int64) (AccountDeletionResult, error)
 }
@@ -358,6 +359,40 @@ func (s *Service) Login(ctx context.Context, input Credentials) (SessionResult, 
 	return s.startSession(ctx, row)
 }
 
+func (s *Service) ChangePassword(ctx context.Context, userID int64, input ChangePasswordInput) error {
+	if inProgress, err := s.SetupRestoreInProgress(ctx); err != nil {
+		return err
+	} else if inProgress {
+		return ErrRestoreInProgress
+	}
+
+	currentPassword, err := normalizePassword(input.CurrentPassword)
+	if err != nil {
+		return ErrInvalidCredentials
+	}
+	newPassword, err := normalizePassword(input.NewPassword)
+	if err != nil {
+		return ErrInvalidInput
+	}
+
+	row, err := s.repo.GetUserByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(row.PasswordHash), []byte(currentPassword)); err != nil {
+		return ErrInvalidCredentials
+	}
+	if bcrypt.CompareHashAndPassword([]byte(row.PasswordHash), []byte(newPassword)) == nil {
+		return ErrPasswordUnchanged
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+	return s.repo.UpdatePasswordAndDeleteSessions(ctx, userID, row.PasswordHash, string(hash))
+}
+
 // DeleteCurrentAccount requires an explicit username/password confirmation
 // before the destructive account removal begins.
 func (s *Service) DeleteCurrentAccount(ctx context.Context, userID int64, input DeleteAccountInput) (AccountDeletionResult, error) {
@@ -500,17 +535,14 @@ func (s *Service) startSession(ctx context.Context, row UserRow) (SessionResult,
 
 func normalizeCredentials(input Credentials) (string, string, error) {
 	username := strings.ToLower(strings.TrimSpace(input.Username))
-	password := strings.TrimSpace(input.Password)
+	password, err := normalizePassword(input.Password)
+	if err != nil {
+		return "", "", err
+	}
 
 	validators := []func() error{
 		func() error {
 			if !usernamePattern.MatchString(username) {
-				return ErrInvalidInput
-			}
-			return nil
-		},
-		func() error {
-			if len(password) < 8 || len(password) > 200 {
 				return ErrInvalidInput
 			}
 			return nil
@@ -524,6 +556,14 @@ func normalizeCredentials(input Credentials) (string, string, error) {
 	}
 
 	return username, password, nil
+}
+
+func normalizePassword(value string) (string, error) {
+	password := strings.TrimSpace(value)
+	if len(password) < 8 || len(password) > 200 {
+		return "", ErrInvalidInput
+	}
+	return password, nil
 }
 
 func randomToken() (string, error) {
@@ -557,6 +597,7 @@ var errorSpecs = []struct {
 	status int
 	kind   string
 }{
+	{ErrPasswordUnchanged, 400, "auth.password_unchanged"},
 	{ErrInvalidInput, 400, "auth.invalid_input"},
 	{ErrInvalidBackup, 400, "setup.invalid_backup"},
 	{ErrRestoreConfirmationMissing, 400, "setup.invalid_input"},

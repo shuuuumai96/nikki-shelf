@@ -3,6 +3,7 @@ import { computed, defineAsyncComponent, onMounted, ref } from "vue";
 import { useAuthStore } from "./features/auth/store";
 import type {
   AuthCredentials,
+  ChangePasswordInput,
   DeleteAccountInput,
 } from "./features/auth/types";
 import { useEntryStore } from "./features/entries/store";
@@ -124,6 +125,12 @@ async function deleteAccount(input: DeleteAccountInput) {
   }
 }
 
+async function changePassword(input: ChangePasswordInput) {
+  await auth.changePassword(input);
+  store.clear();
+  replacePath("/");
+}
+
 async function refreshSetupStatus() {
   setupReady.value = false;
   setupError.value = "";
@@ -173,6 +180,7 @@ function replacePath(path: string) {
     :auth-error="auth.error"
     :store="store"
     :user="auth.user"
+    @change-password="changePassword"
     @delete-account="deleteAccount"
     @logout="logout"
   />

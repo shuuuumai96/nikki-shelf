@@ -12,6 +12,7 @@ var (
 	ErrRestoreCountMismatch       = errors.New("restored backup counts do not match")
 	ErrRestoreFailed              = errors.New("restore failed")
 	ErrRestoreInProgress          = errors.New("setup restore is in progress")
+	ErrPasswordUnchanged          = errors.New("new password must differ from the current password")
 	ErrSetupLocked                = errors.New("setup is already complete")
 	ErrSignupClosed               = errors.New("signup is currently disabled")
 	ErrUsernameExists             = errors.New("this username is already in use")

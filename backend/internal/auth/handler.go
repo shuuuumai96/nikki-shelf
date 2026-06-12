@@ -49,6 +49,7 @@ func (h *Handler) Register(api *echo.Group) {
 	api.POST("/auth/login", h.login)
 	api.POST("/auth/logout", h.logout, CSRF(h.service))
 	api.GET("/auth/me", h.me)
+	api.PUT("/auth/me/password", h.changePassword, Require(h.service), CSRF(h.service))
 	api.DELETE("/auth/me", h.deleteMe, Require(h.service), CSRF(h.service))
 	api.GET("/setup/status", h.setupStatus)
 	api.POST("/setup/owner", h.setupOwner)
@@ -244,6 +245,40 @@ func (h *Handler) logout(c echo.Context) error {
 
 	clearSessionCookie(c, h.cookieSecure)
 	logx.Event(c, "auth.logout_succeeded")
+	return httpx.NoContent(c)
+}
+
+func (h *Handler) changePassword(c echo.Context) error {
+	user, ok := UserFromContext(c)
+	if !ok {
+		return httpx.ErrorWithKind(c, http.StatusUnauthorized, ErrUnauthorized.Error(), "auth.unauthorized")
+	}
+
+	input := ChangePasswordInput{}
+	if err := httpx.DecodeJSONWithLimit(c, &input, httpx.AuthJSONLimitBytes); err != nil {
+		if errors.Is(err, httpx.ErrRequestTooLarge) {
+			return httpx.ErrorWithKind(c, http.StatusRequestEntityTooLarge, "request JSON is too large", "request.too_large")
+		}
+		return httpx.ErrorWithKind(c, http.StatusBadRequest, "check the request JSON", "request.invalid_json")
+	}
+
+	rateKey := user.Username
+	if h.rateLimiter != nil && !h.rateLimiter.Allow(c, rateKey) {
+		return rateLimitError(c)
+	}
+
+	if err := h.service.ChangePassword(c.Request().Context(), user.ID, input); err != nil {
+		if h.rateLimiter != nil {
+			h.rateLimiter.RecordFailure(c, rateKey)
+		}
+		return authError(c, err)
+	}
+	if h.rateLimiter != nil {
+		h.rateLimiter.RecordSuccess(c, rateKey)
+	}
+
+	clearSessionCookie(c, h.cookieSecure)
+	logx.Event(c, "auth.password_changed", slog.Int64("user_id", user.ID))
 	return httpx.NoContent(c)
 }
 

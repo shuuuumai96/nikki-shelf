@@ -1,9 +1,13 @@
 <script setup lang="ts">
-import { Download, LogOut, Trash2, X } from "lucide-vue-next";
+import { Download, KeyRound, LogOut, Trash2, X } from "lucide-vue-next";
 import { computed, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import LanguageSelect from "../../../shared/components/LanguageSelect.vue";
-import type { AuthUser, DeleteAccountInput } from "../../auth/types";
+import type {
+  AuthUser,
+  ChangePasswordInput,
+  DeleteAccountInput,
+} from "../../auth/types";
 import {
   readMemoryPreferences,
   writeMemoryPreferences,
@@ -18,12 +22,21 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
+  changePassword: [input: ChangePasswordInput];
   deleteAccount: [input: DeleteAccountInput];
   logout: [];
 }>();
 
 const { t } = useI18n();
 const memoryPreferences = ref(readMemoryPreferences());
+const accountErrorSource = ref<"change" | "delete" | null>(null);
+const changePanelOpen = ref(false);
+const changeError = ref("");
+const changeForm = reactive({
+  currentPassword: "",
+  newPassword: "",
+  confirmPassword: "",
+});
 const deletePanelOpen = ref(false);
 const deleteError = ref("");
 const deleteForm = reactive({
@@ -42,8 +55,24 @@ const canSubmitDelete = computed(
     deleteForm.password.trim().length > 0 &&
     !props.loading,
 );
+const canSubmitChange = computed(
+  () =>
+    changeForm.currentPassword.trim().length > 0 &&
+    changeForm.newPassword.trim().length > 0 &&
+    changeForm.confirmPassword.trim().length > 0 &&
+    !props.loading,
+);
+const changeVisibleError = computed(
+  () =>
+    changeError.value ||
+    (accountErrorSource.value === "change" ? props.error : "") ||
+    "",
+);
 const deleteVisibleError = computed(
-  () => deleteError.value || props.error || "",
+  () =>
+    deleteError.value ||
+    (accountErrorSource.value === "delete" ? props.error : "") ||
+    "",
 );
 
 function setMemoryEnabled(event: Event) {
@@ -75,6 +104,9 @@ function updateMemoryPreferences(
 }
 
 function openDeletePanel() {
+  changePanelOpen.value = false;
+  resetChangeForm();
+  accountErrorSource.value = null;
   deletePanelOpen.value = true;
   deleteError.value = "";
   deleteForm.username = "";
@@ -83,12 +115,65 @@ function openDeletePanel() {
 
 function closeDeletePanel() {
   deletePanelOpen.value = false;
+  accountErrorSource.value = null;
+  resetDeleteForm();
+}
+
+function openChangePanel() {
+  deletePanelOpen.value = false;
+  resetDeleteForm();
+  accountErrorSource.value = null;
+  changePanelOpen.value = true;
+  resetChangeForm();
+}
+
+function closeChangePanel() {
+  changePanelOpen.value = false;
+  accountErrorSource.value = null;
+  resetChangeForm();
+}
+
+function resetChangeForm() {
+  changeError.value = "";
+  changeForm.currentPassword = "";
+  changeForm.newPassword = "";
+  changeForm.confirmPassword = "";
+}
+
+function resetDeleteForm() {
   deleteError.value = "";
   deleteForm.username = "";
   deleteForm.password = "";
 }
 
+function submitChangePassword() {
+  accountErrorSource.value = "change";
+  if (!changeForm.currentPassword.trim()) {
+    changeError.value = t("settings.changePasswordCurrentRequired");
+    return;
+  }
+  if (!validPasswordLength(changeForm.newPassword)) {
+    changeError.value = t("settings.changePasswordLength");
+    return;
+  }
+  if (changeForm.newPassword.trim() === changeForm.currentPassword.trim()) {
+    changeError.value = t("settings.changePasswordSame");
+    return;
+  }
+  if (changeForm.newPassword.trim() !== changeForm.confirmPassword.trim()) {
+    changeError.value = t("settings.changePasswordMismatch");
+    return;
+  }
+
+  changeError.value = "";
+  emit("changePassword", {
+    currentPassword: changeForm.currentPassword,
+    newPassword: changeForm.newPassword,
+  });
+}
+
 function submitDeleteAccount() {
+  accountErrorSource.value = "delete";
   if (!deleteUsernameMatches.value) {
     deleteError.value = t("settings.deleteAccountUsernameMismatch");
     return;
@@ -104,6 +189,11 @@ function submitDeleteAccount() {
     password: deleteForm.password,
   });
 }
+
+function validPasswordLength(value: string) {
+  const length = value.trim().length;
+  return length >= 8 && length <= 200;
+}
 </script>
 
 <template>
@@ -113,17 +203,31 @@ function submitDeleteAccount() {
     <div class="settings-block">
       <h2>{{ t("settings.account") }}</h2>
       <div class="account-card">
-        <span>{{ user.username }}</span>
-        <div class="account-actions">
-          <button
-            class="ui-action"
-            type="button"
-            :disabled="loading"
-            @click="emit('logout')"
-          >
-            <LogOut :size="16" stroke-width="1.8" />
-            <span>{{ t("nav.logout") }}</span>
-          </button>
+        <div class="account-summary">
+          <span class="account-name">{{ user.username }}</span>
+          <div class="account-actions">
+            <button
+              class="ui-action"
+              data-testid="open-change-password"
+              type="button"
+              :disabled="loading"
+              @click="openChangePanel"
+            >
+              <KeyRound :size="16" stroke-width="1.8" />
+              <span>{{ t("settings.changePassword") }}</span>
+            </button>
+            <button
+              class="ui-action"
+              type="button"
+              :disabled="loading"
+              @click="emit('logout')"
+            >
+              <LogOut :size="16" stroke-width="1.8" />
+              <span>{{ t("nav.logout") }}</span>
+            </button>
+          </div>
+        </div>
+        <div class="account-danger-actions">
           <button
             class="ui-action danger-action"
             data-testid="open-delete-account"
@@ -136,6 +240,82 @@ function submitDeleteAccount() {
           </button>
         </div>
       </div>
+      <form
+        v-if="changePanelOpen"
+        class="account-panel"
+        data-testid="change-password-panel"
+        @submit.prevent="submitChangePassword"
+      >
+        <div class="account-panel__head">
+          <h3>{{ t("settings.changePassword") }}</h3>
+          <button
+            class="icon-button"
+            type="button"
+            :aria-label="t('common.close')"
+            :disabled="loading"
+            @click="closeChangePanel"
+          >
+            <X :size="16" stroke-width="1.8" />
+          </button>
+        </div>
+        <p>{{ t("settings.changePasswordBody") }}</p>
+        <label>
+          <span>{{ t("settings.currentPassword") }}</span>
+          <input
+            v-model="changeForm.currentPassword"
+            autocomplete="current-password"
+            data-testid="change-password-current"
+            type="password"
+            :disabled="loading"
+            :aria-invalid="Boolean(changeVisibleError)"
+          />
+        </label>
+        <label>
+          <span>{{ t("settings.newPassword") }}</span>
+          <input
+            v-model="changeForm.newPassword"
+            autocomplete="new-password"
+            data-testid="change-password-new"
+            type="password"
+            :disabled="loading"
+            :aria-invalid="Boolean(changeVisibleError)"
+          />
+        </label>
+        <label>
+          <span>{{ t("settings.confirmNewPassword") }}</span>
+          <input
+            v-model="changeForm.confirmPassword"
+            autocomplete="new-password"
+            data-testid="change-password-confirm"
+            type="password"
+            :disabled="loading"
+            :aria-invalid="Boolean(changeVisibleError)"
+          />
+        </label>
+        <p v-if="changeVisibleError" class="account-panel__error">
+          {{ changeVisibleError }}
+        </p>
+        <div class="account-panel__actions">
+          <button
+            class="ui-action"
+            type="button"
+            :disabled="loading"
+            @click="closeChangePanel"
+          >
+            <X :size="16" stroke-width="1.8" />
+            <span>{{ t("settings.changePasswordCancel") }}</span>
+          </button>
+          <button
+            class="ui-action"
+            data-testid="change-password-submit"
+            type="submit"
+            :disabled="!canSubmitChange"
+          >
+            <KeyRound :size="16" stroke-width="1.8" />
+            <span>{{ t("settings.changePasswordSubmit") }}</span>
+          </button>
+        </div>
+      </form>
       <form
         v-if="deletePanelOpen"
         class="danger-panel"
@@ -289,13 +469,16 @@ h2 {
 }
 
 .account-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  display: grid;
+  gap: 14px;
+}
+
+.account-summary {
+  display: grid;
   gap: 12px;
 }
 
-.account-card > span {
+.account-name {
   overflow: hidden;
   color: var(--color-text);
   font-size: 15px;
@@ -308,7 +491,13 @@ h2 {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  justify-content: flex-end;
+  justify-content: flex-start;
+}
+
+.account-danger-actions {
+  display: flex;
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 14px;
 }
 
 .danger-action {
@@ -320,6 +509,77 @@ h2 {
 .danger-action:focus-visible {
   background: var(--color-danger-bg);
   color: var(--color-danger);
+}
+
+.account-panel {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  padding: 14px;
+}
+
+.account-panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.account-panel h3 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 15px;
+}
+
+.account-panel p {
+  margin: 0;
+  color: var(--color-text-soft);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.account-panel label {
+  display: grid;
+  gap: 6px;
+  color: var(--color-muted);
+  font-size: 12px;
+}
+
+.account-panel input {
+  min-height: 38px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  color: var(--color-text);
+  padding: 0 10px;
+  font: inherit;
+}
+
+.account-panel input:focus {
+  border-color: var(--border-active);
+  outline: 0;
+}
+
+.account-panel input[aria-invalid="true"] {
+  border-color: var(--color-danger-border);
+}
+
+.account-panel__error {
+  border: 1px solid var(--color-danger-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-danger-bg);
+  color: var(--color-danger) !important;
+  padding: 8px 10px;
+}
+
+.account-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .danger-panel {
@@ -479,12 +739,9 @@ h2 {
     grid-template-columns: 1fr;
   }
 
-  .account-card {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
   .account-actions,
+  .account-danger-actions,
+  .account-panel__actions,
   .danger-panel__actions {
     display: grid;
     grid-template-columns: 1fr;

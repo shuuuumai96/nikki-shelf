@@ -8,6 +8,7 @@ This changelog follows a simple Keep a Changelog-style structure. Nikki has not 
 
 ### Added
 
+- Added production-grade password change from Settings, requiring the current password and revoking all active sessions after a successful change.
 - Added a Today-screen memory shelf for revisiting older diary entries, with mood exclusions, collapse/expand behavior, and a direct return-to-Today flow after opening a memory.
 
 ### Fixed

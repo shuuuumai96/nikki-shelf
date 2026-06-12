@@ -228,6 +228,18 @@ export default {
     memories: "Memories",
     memoriesEnabled: "Show random memories on Today",
     memoriesExcludedMoods: "Moods to hide",
+    changePassword: "Change password",
+    changePasswordBody:
+      "Changing it signs out every session. Log in again after this completes.",
+    currentPassword: "Current password",
+    newPassword: "New password",
+    confirmNewPassword: "Confirm new password",
+    changePasswordCancel: "Cancel",
+    changePasswordSubmit: "Change",
+    changePasswordCurrentRequired: "Enter your current password.",
+    changePasswordLength: "New passwords must be 8 to 200 characters.",
+    changePasswordMismatch: "The new password confirmation does not match.",
+    changePasswordSame: "Enter a password different from the current one.",
     deleteAccount: "Delete account",
     deleteAccountBody:
       "This permanently deletes your diary entries, images, and sessions. Export anything you need first.",
@@ -276,6 +288,7 @@ export default {
         invalid_input: "Check the username and password.",
         invalid_credentials: "Check the username or password.",
         unauthorized: "Log in to continue.",
+        password_unchanged: "Enter a password different from the current one.",
         signup_closed: "Sign up is currently disabled.",
         username_exists: "This username is already in use.",
         owner_account_required:

@@ -3,6 +3,7 @@ import type {
   AuthConfig,
   AuthCredentials,
   AuthUser,
+  ChangePasswordInput,
   DeleteAccountInput,
 } from "./types";
 
@@ -31,6 +32,13 @@ export function logout(): Promise<void> {
 export function deleteAccount(input: DeleteAccountInput): Promise<void> {
   return request<void>("/api/auth/me", {
     method: "DELETE",
+    body: JSON.stringify(input),
+  });
+}
+
+export function changePassword(input: ChangePasswordInput): Promise<void> {
+  return request<void>("/api/auth/me/password", {
+    method: "PUT",
     body: JSON.stringify(input),
   });
 }
