@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import type { AuthUser, DeleteAccountInput } from "../../features/auth/types";
+import type {
+  AuthUser,
+  ChangePasswordInput,
+  DeleteAccountInput,
+} from "../../features/auth/types";
 import type { UploadImageRequest } from "../../features/entries/api";
 import TodayView from "../../features/entries/components/TodayView.vue";
 import {
@@ -37,6 +41,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
+  changePassword: [input: ChangePasswordInput];
   deleteAccount: [input: DeleteAccountInput];
   logout: [];
 }>();
@@ -238,6 +243,7 @@ function preloadNavigationViews() {
         :error="authError"
         :user="user"
         :loading="authLoading"
+        @change-password="emit('changePassword', $event)"
         @delete-account="emit('deleteAccount', $event)"
         @logout="emit('logout')"
       />

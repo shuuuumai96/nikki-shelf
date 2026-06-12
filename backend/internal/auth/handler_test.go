@@ -907,6 +907,154 @@ func TestDeleteAccountEndpointClearsSessionCookie(t *testing.T) {
 	}
 }
 
+func TestChangePasswordUpdatesHashAndRevokesSessions(t *testing.T) {
+	repo := newFakeAuthRepo(0)
+	user := repo.addUser(t, "tester", "password123", RoleUser)
+	otherUser := repo.addUser(t, "viewer", "password123", RoleUser)
+	repo.sessions[hashToken("session-token")] = SessionRow{User: user, CSRFHash: hashToken("csrf-token")}
+	repo.sessions[hashToken("other-session")] = SessionRow{User: user, CSRFHash: hashToken("other-csrf")}
+	repo.sessions[hashToken("viewer-session")] = SessionRow{User: otherUser, CSRFHash: hashToken("viewer-csrf")}
+
+	err := NewService(repo).ChangePassword(context.Background(), user.ID, ChangePasswordInput{
+		CurrentPassword: "password123",
+		NewPassword:     "new-password-123",
+	})
+	if err != nil {
+		t.Fatalf("ChangePassword() error = %v", err)
+	}
+
+	if repo.passwordMatches(t, "tester", "password123") {
+		t.Fatal("old password still matches after password change")
+	}
+	if !repo.passwordMatches(t, "tester", "new-password-123") {
+		t.Fatal("new password does not match after password change")
+	}
+	if repo.sessionExists("session-token") || repo.sessionExists("other-session") {
+		t.Fatal("changed user's sessions still exist after password change")
+	}
+	if !repo.sessionExists("viewer-session") {
+		t.Fatal("other user's session was removed by password change")
+	}
+}
+
+func TestChangePasswordRejectsWrongCurrentPassword(t *testing.T) {
+	repo := newFakeAuthRepo(0)
+	user := repo.addUser(t, "tester", "password123", RoleUser)
+	repo.sessions[hashToken("session-token")] = SessionRow{User: user, CSRFHash: hashToken("csrf-token")}
+
+	err := NewService(repo).ChangePassword(context.Background(), user.ID, ChangePasswordInput{
+		CurrentPassword: "wrong-password",
+		NewPassword:     "new-password-123",
+	})
+	if !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("ChangePassword() error = %v, want %v", err, ErrInvalidCredentials)
+	}
+	if !repo.passwordMatches(t, "tester", "password123") {
+		t.Fatal("password changed after wrong current password")
+	}
+	if !repo.sessionExists("session-token") {
+		t.Fatal("session was removed after wrong current password")
+	}
+}
+
+func TestChangePasswordRejectsUnchangedPassword(t *testing.T) {
+	repo := newFakeAuthRepo(0)
+	user := repo.addUser(t, "tester", "password123", RoleUser)
+	repo.sessions[hashToken("session-token")] = SessionRow{User: user, CSRFHash: hashToken("csrf-token")}
+
+	err := NewService(repo).ChangePassword(context.Background(), user.ID, ChangePasswordInput{
+		CurrentPassword: "password123",
+		NewPassword:     "password123",
+	})
+	if !errors.Is(err, ErrPasswordUnchanged) {
+		t.Fatalf("ChangePassword() error = %v, want %v", err, ErrPasswordUnchanged)
+	}
+	if !repo.passwordMatches(t, "tester", "password123") {
+		t.Fatal("password changed after unchanged password rejection")
+	}
+	if !repo.sessionExists("session-token") {
+		t.Fatal("session was removed after unchanged password rejection")
+	}
+}
+
+func TestChangePasswordEndpointClearsCookieAndRevokesSessions(t *testing.T) {
+	repo := newFakeAuthRepo(0)
+	user := repo.addUser(t, "tester", "password123", RoleUser)
+	repo.sessions[hashToken("session-token")] = SessionRow{User: user, CSRFHash: hashToken("csrf-token")}
+	repo.sessions[hashToken("phone-session")] = SessionRow{User: user, CSRFHash: hashToken("phone-csrf")}
+
+	response := performChangePasswordRequest(NewService(repo), `{"currentPassword":"password123","newPassword":"new-password-123"}`)
+	if response.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want %d; body=%s", response.Code, http.StatusNoContent, response.Body.String())
+	}
+
+	cookies := response.Result().Cookies()
+	if len(cookies) == 0 || cookies[0].Name != SessionCookieName || cookies[0].MaxAge != -1 {
+		t.Fatalf("cookies = %#v, want cleared session cookie", cookies)
+	}
+	if repo.sessionExists("session-token") || repo.sessionExists("phone-session") {
+		t.Fatal("sessions still exist after password change")
+	}
+	if !repo.passwordMatches(t, "tester", "new-password-123") {
+		t.Fatal("new password does not match after endpoint password change")
+	}
+}
+
+func TestChangePasswordEndpointRequiresCSRF(t *testing.T) {
+	repo := newFakeAuthRepo(0)
+	user := repo.addUser(t, "tester", "password123", RoleUser)
+	repo.sessions[hashToken("session-token")] = SessionRow{User: user, CSRFHash: hashToken("csrf-token")}
+
+	response := performChangePasswordRequestWithCSRF(NewService(repo), `{"currentPassword":"password123","newPassword":"new-password-123"}`, "")
+	if response.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want %d; body=%s", response.Code, http.StatusForbidden, response.Body.String())
+	}
+	if !repo.passwordMatches(t, "tester", "password123") {
+		t.Fatal("password changed without CSRF token")
+	}
+}
+
+func TestChangePasswordEndpointRateLimitsFailures(t *testing.T) {
+	repo := newFakeAuthRepo(0)
+	user := repo.addUser(t, "tester", "password123", RoleUser)
+	repo.sessions[hashToken("session-token")] = SessionRow{User: user, CSRFHash: hashToken("csrf-token")}
+	limiter := NewRateLimiter(RateLimiterConfig{
+		IPAttempts:      1,
+		AccountAttempts: 1,
+		Window:          time.Minute,
+		Lockout:         time.Minute,
+	})
+
+	first := performChangePasswordRequestWithCSRF(
+		NewService(repo),
+		`{"currentPassword":"wrong-password","newPassword":"new-password-123"}`,
+		"csrf-token",
+		HandlerConfig{RateLimiter: limiter},
+	)
+	if first.Code != http.StatusUnauthorized {
+		t.Fatalf("first status = %d, want %d; body=%s", first.Code, http.StatusUnauthorized, first.Body.String())
+	}
+	if strings.Contains(first.Body.String(), "wrong-password") || strings.Contains(first.Body.String(), "new-password-123") {
+		t.Fatalf("response leaked password fields: %s", first.Body.String())
+	}
+
+	second := performChangePasswordRequestWithCSRF(
+		NewService(repo),
+		`{"currentPassword":"password123","newPassword":"new-password-123"}`,
+		"csrf-token",
+		HandlerConfig{RateLimiter: limiter},
+	)
+	if second.Code != http.StatusTooManyRequests {
+		t.Fatalf("second status = %d, want %d; body=%s", second.Code, http.StatusTooManyRequests, second.Body.String())
+	}
+	if !repo.passwordMatches(t, "tester", "password123") {
+		t.Fatal("password changed while rate limited")
+	}
+	if !repo.sessionExists("session-token") {
+		t.Fatal("session was removed while rate limited")
+	}
+}
+
 func TestLoginDoesNotRequireBootstrapToken(t *testing.T) {
 	repo := newFakeAuthRepo(1)
 	hash, err := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.DefaultCost)
@@ -1145,6 +1293,26 @@ func performDeleteAccountRequest(service *Service, body string) *httptest.Respon
 	request := httptest.NewRequest(http.MethodDelete, "/api/auth/me", strings.NewReader(body))
 	request.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	request.Header.Set("X-CSRF-Token", "csrf-token")
+	request.AddCookie(&http.Cookie{Name: SessionCookieName, Value: "session-token"})
+	response := httptest.NewRecorder()
+	server.ServeHTTP(response, request)
+	return response
+}
+
+func performChangePasswordRequest(service *Service, body string) *httptest.ResponseRecorder {
+	return performChangePasswordRequestWithCSRF(service, body, "csrf-token")
+}
+
+func performChangePasswordRequestWithCSRF(service *Service, body string, csrfToken string, configs ...HandlerConfig) *httptest.ResponseRecorder {
+	server := echo.New()
+	api := server.Group("/api")
+	NewHandler(service, configs...).Register(api)
+
+	request := httptest.NewRequest(http.MethodPut, "/api/auth/me/password", strings.NewReader(body))
+	request.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	if csrfToken != "" {
+		request.Header.Set("X-CSRF-Token", csrfToken)
+	}
 	request.AddCookie(&http.Cookie{Name: SessionCookieName, Value: "session-token"})
 	response := httptest.NewRecorder()
 	server.ServeHTTP(response, request)
@@ -1513,6 +1681,36 @@ func (r *fakeAuthRepo) DeleteExpiredSessions(context.Context, time.Time) error {
 	return nil
 }
 
+func (r *fakeAuthRepo) UpdatePasswordAndDeleteSessions(_ context.Context, userID int64, currentPasswordHash string, nextPasswordHash string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	var username string
+	var user UserRow
+	for candidate, row := range r.users {
+		if row.ID == userID {
+			username = candidate
+			user = row
+			break
+		}
+	}
+	if username == "" {
+		return ErrUnauthorized
+	}
+	if user.PasswordHash != currentPasswordHash {
+		return ErrInvalidCredentials
+	}
+
+	user.PasswordHash = nextPasswordHash
+	r.users[username] = user
+	for tokenHash, session := range r.sessions {
+		if session.User.ID == userID {
+			delete(r.sessions, tokenHash)
+		}
+	}
+	return nil
+}
+
 func (r *fakeAuthRepo) ClaimLegacyEntries(_ context.Context, userID int64) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -1563,6 +1761,23 @@ func (r *fakeAuthRepo) user(username string) UserRow {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.users[username]
+}
+
+func (r *fakeAuthRepo) passwordMatches(t *testing.T, username string, password string) bool {
+	t.Helper()
+
+	row := r.user(username)
+	if row.PasswordHash == "" {
+		return false
+	}
+	return bcrypt.CompareHashAndPassword([]byte(row.PasswordHash), []byte(password)) == nil
+}
+
+func (r *fakeAuthRepo) sessionExists(token string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	_, ok := r.sessions[hashToken(token)]
+	return ok
 }
 
 func (r *fakeAuthRepo) locked() bool {

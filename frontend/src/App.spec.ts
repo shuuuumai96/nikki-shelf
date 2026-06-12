@@ -84,6 +84,9 @@ describe("App", () => {
       deleteAccount: vi.fn(async () => {
         mocks.authStore.user = null;
       }),
+      changePassword: vi.fn(async () => {
+        mocks.authStore.user = null;
+      }),
       start: vi.fn(async (action: () => Promise<AuthUser>) => {
         mocks.authStore.user = await action();
         mocks.authStore.ready = true;
@@ -201,6 +204,36 @@ describe("App", () => {
     });
     expect(mocks.entryStore.clear).toHaveBeenCalledTimes(1);
     expect(window.location.pathname).toBe("/setup");
+  });
+
+  it("signs out and clears diary state after changing password", async () => {
+    mocks.authStore.bootstrap = vi.fn(async () => {
+      mocks.authStore.user = user();
+      mocks.authStore.ready = true;
+    });
+    const wrapper = mountApp();
+    await flushPromises();
+
+    await wrapper
+      .findComponent({ name: "AppSidebar" })
+      .vm.$emit("update:modelValue", "settings");
+    await vi.dynamicImportSettled();
+    await flushPromises();
+    await wrapper
+      .findComponent({ name: "SettingsPanel" })
+      .vm.$emit("changePassword", {
+        currentPassword: "password123",
+        newPassword: "new-password-123",
+      });
+    await flushPromises();
+
+    expect(mocks.authStore.changePassword).toHaveBeenCalledWith({
+      currentPassword: "password123",
+      newPassword: "new-password-123",
+    });
+    expect(mocks.entryStore.clear).toHaveBeenCalledTimes(1);
+    expect(window.location.pathname).toBe("/");
+    expect(wrapper.find('[data-testid="auth-panel"]').exists()).toBe(true);
   });
 
   it("shows the offline banner when the browser is offline", async () => {
@@ -361,7 +394,7 @@ function mountApp() {
         Search: true,
         SettingsPanel: {
           name: "SettingsPanel",
-          emits: ["deleteAccount"],
+          emits: ["changePassword", "deleteAccount"],
           template: '<section data-testid="settings-panel"></section>',
         },
         SetupPanel: {

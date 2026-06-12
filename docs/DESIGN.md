@@ -166,6 +166,8 @@ Nikki assumes a trusted operator-controlled environment. It is not designed as a
 
 Access to diary data and uploaded images is authenticated. File upload handling validates detected image content types, applies size limits, stores generated file names, and serves image content only after database-backed ownership checks. The upload directory must not be exposed as a public static webroot.
 
+Password changes require the current password, authenticated CSRF protection, and backend-side session revocation for every active session owned by that user.
+
 Operators are responsible for deployment security, backups, restore testing, and access control around the host. Nikki does not claim enterprise security, hardened SaaS security, or complete protection.
 
 ## 11. Known Limitations

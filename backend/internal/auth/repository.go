@@ -254,6 +254,42 @@ func (r *Repository) DeleteExpiredSessions(ctx context.Context, now time.Time) e
 	return err
 }
 
+func (r *Repository) UpdatePasswordAndDeleteSessions(ctx context.Context, userID int64, currentPasswordHash string, nextPasswordHash string) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	storedHash := ""
+	if err := tx.QueryRowContext(ctx, `SELECT password_hash FROM users WHERE id = $1 FOR UPDATE`, userID).Scan(&storedHash); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrUnauthorized
+		}
+		return err
+	}
+	if storedHash != currentPasswordHash {
+		return ErrInvalidCredentials
+	}
+
+	result, err := tx.ExecContext(ctx, `UPDATE users SET password_hash = $1 WHERE id = $2`, nextPasswordHash, userID)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return ErrUnauthorized
+	}
+
+	if _, err := tx.ExecContext(ctx, `DELETE FROM sessions WHERE user_id = $1`, userID); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
 func (r *Repository) ClaimLegacyEntries(ctx context.Context, userID int64) error {
 	_, err := r.db.ExecContext(ctx, `UPDATE entries SET user_id = $1 WHERE user_id IS NULL`, userID)
 	return err

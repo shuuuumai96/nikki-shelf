@@ -6,13 +6,19 @@ import {
   setCSRFToken,
 } from "../../shared/api/client";
 import {
+  changePassword as changePasswordRequest,
   deleteAccount as deleteAccountRequest,
   login,
   logout,
   me,
   signup,
 } from "./api";
-import type { AuthCredentials, AuthUser, DeleteAccountInput } from "./types";
+import type {
+  AuthCredentials,
+  AuthUser,
+  ChangePasswordInput,
+  DeleteAccountInput,
+} from "./types";
 
 type AuthState = {
   user: AuthUser | null;
@@ -67,6 +73,20 @@ export const useAuthStore = defineStore("auth", {
       this.error = "";
       try {
         await deleteAccountRequest(input);
+        this.user = null;
+        clearCSRFToken();
+      } catch (error) {
+        this.error = errorMessage(error);
+        throw error;
+      } finally {
+        this.loading = false;
+      }
+    },
+    async changePassword(input: ChangePasswordInput) {
+      this.loading = true;
+      this.error = "";
+      try {
+        await changePasswordRequest(input);
         this.user = null;
         clearCSRFToken();
       } catch (error) {

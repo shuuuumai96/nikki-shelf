@@ -21,3 +21,8 @@ export type DeleteAccountInput = {
   username: string;
   password: string;
 };
+
+export type ChangePasswordInput = {
+  currentPassword: string;
+  newPassword: string;
+};

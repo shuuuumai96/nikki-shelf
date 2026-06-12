@@ -62,7 +62,7 @@ Important paths:
 Core entities are defined in `backend/internal/db/schema.sql`.
 
 - `users`: application users. Each user has a unique username and password hash.
-- `sessions`: login sessions. Each session belongs to a user and is removed when the user is deleted.
+- `sessions`: login sessions. Each session belongs to a user and is removed when the user is deleted or changes their password.
 - `entries`: diary entries. Each entry belongs to a user, has a unique `(user_id, entry_date)` pair, stores title, body, mood, tags JSON, and a `version` for stale update detection.
 - `images`: image attachment metadata. Each image belongs to an entry, stores the disk file path, public URL, original/safe file name, size, MIME type, and creation time.
 - `settings`: key/value settings table.

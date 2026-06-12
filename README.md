@@ -29,6 +29,7 @@ Public exposure requires careful production configuration, access control, and b
 - moods
 - basic past-entry search
 - random memory shelf for revisiting older entries
+- password change with full session revocation
 - normal autosave for single-tab writing
 - stale-version conflict fallback
 - desktop-supported image attachments

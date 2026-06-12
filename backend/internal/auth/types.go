@@ -22,6 +22,11 @@ type DeleteAccountInput struct {
 	Password string `json:"password"`
 }
 
+type ChangePasswordInput struct {
+	CurrentPassword string `json:"currentPassword"`
+	NewPassword     string `json:"newPassword"`
+}
+
 type AccountDeletionResult struct {
 	// ImageFilePaths are deleted after the account rows are no longer reachable.
 	ImageFilePaths []string
