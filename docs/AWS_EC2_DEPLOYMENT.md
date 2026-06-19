@@ -180,6 +180,33 @@ curl -i \
 
 Expected result for owner creation: `200`, a session cookie, and creation of the owner user. Expected result for restore: verified archive, restored entries/images, setup lock, and return to login. A second call to `/api/setup/owner` or `/api/setup/restore` after this must return `409`. The token and password in this example are placeholders only. Do not paste real tokens, passwords, cookies, operational backup archives, screenshots containing them, or shared shell logs into tickets or chat.
 
+After the owner user exists, run the automated smoke test from the deployment checkout:
+
+```bash
+export NIKKI_SMOKE_BASE_URL=https://your-real-domain.example
+export NIKKI_SMOKE_USERNAME=owner
+read -rs NIKKI_SMOKE_PASSWORD
+export NIKKI_SMOKE_PASSWORD
+sh ./scripts/smoke-production.sh
+```
+
+The script checks production Compose configuration, public health, closed signup, locked setup, login, CSRF rejection, diary create/read/update/delete, search, memory shelf, image upload/display/delete, owner audit history, logout, and unauthenticated access rejection. It creates and deletes one disposable entry at `NIKKI_SMOKE_ENTRY_DATE`, which defaults to `2099-12-31`; set a different unused date if that date already exists.
+
+Password-change smoke is available but intentionally opt-in because it temporarily changes the smoke user's password and then changes it back:
+
+```bash
+export NIKKI_SMOKE_RUN_PASSWORD_CHANGE=true
+read -rs NIKKI_SMOKE_NEW_PASSWORD
+export NIKKI_SMOKE_NEW_PASSWORD
+sh ./scripts/smoke-production.sh
+```
+
+Operational backup smoke is also opt-in because it creates sensitive backup artifacts:
+
+```bash
+NIKKI_SMOKE_RUN_BACKUP=true sh ./scripts/smoke-production.sh
+```
+
 From a browser at the public HTTPS origin after the owner user exists:
 
 - Login works.

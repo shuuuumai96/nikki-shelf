@@ -284,6 +284,18 @@ curl -i \
 
 Expected result: `403`. Do not paste real session cookies into shared logs or tickets.
 
+Automated smoke check after the owner exists:
+
+```bash
+export NIKKI_SMOKE_BASE_URL=https://<your-domain>
+export NIKKI_SMOKE_USERNAME=owner
+read -rs NIKKI_SMOKE_PASSWORD
+export NIKKI_SMOKE_PASSWORD
+sh ./scripts/smoke-production.sh
+```
+
+This covers health, setup lock, auth, CSRF rejection, diary CRUD, search, memory shelf, image upload/display/delete, owner audit history, logout, and unauthenticated access rejection. It creates and deletes one disposable entry and image. Set `NIKKI_SMOKE_ENTRY_DATE` to a different unused date if the default `2099-12-31` exists.
+
 ## 9. Backup Test
 
 Positive backup:
@@ -462,6 +474,7 @@ The private EC2 test may start only if all items are true:
 - `NIKKI_FIRST_USER_BOOTSTRAP_TOKEN` is set to a long random secret and is not a placeholder.
 - `NIKKI_CORS_ALLOWED_ORIGINS` is the exact HTTPS origin.
 - `NIKKI_AUDIT_RETENTION_DAYS` is set to a positive bounded value.
+- `scripts/smoke-production.sh` passes against the HTTPS origin.
 - Backup positive test passes.
 - Invalid uploads volume backup test fails safely.
 - Age encryption positive test passes on EC2.

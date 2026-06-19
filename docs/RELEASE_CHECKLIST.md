@@ -49,6 +49,7 @@ docker compose -f docker-compose.check.yml run --rm checks
 | Trusted proxy behavior is explicit | `NIKKI_IP_EXTRACTOR_MODE` and `NIKKI_TRUSTED_PROXY_CIDRS` match the deployed reverse proxy chain |
 | Auth rate limiting exists | `NIKKI_AUTH_RATE_LIMIT_IP_ATTEMPTS`, `NIKKI_AUTH_RATE_LIMIT_ACCOUNT_ATTEMPTS`, and `NIKKI_AUTH_RATE_LIMIT_WINDOW` protect login, signup, password change, account deletion, setup owner creation, and setup restore APIs |
 | Audit retention is configured | `NIKKI_AUDIT_RETENTION_DAYS` is present and positive; owner Settings can load recent security history |
+| Production smoke script is available | `sh ./scripts/smoke-production.sh` verifies the non-destructive production HTTP flows when `NIKKI_SMOKE_BASE_URL`, `NIKKI_SMOKE_USERNAME`, and `NIKKI_SMOKE_PASSWORD` are set in a private shell; password-change and backup checks are opt-in |
 | Backup command exists | `scripts/backup-production.sh` creates a timestamped Nikki operational backup archive and detects the backend `/uploads` Docker volume when `UPLOADS_VOLUME` is not set |
 | Backup refuses missing uploads volume | `UPLOADS_VOLUME=missing-volume scripts/backup-production.sh` fails before running `tar` |
 | Backup artifacts are usable as one set | Backup creates a non-empty operational `.tar.gz` containing DB dump, uploads archive, manifest, and checksums from the same timestamp, or clearly warns if uploads are empty |
@@ -73,6 +74,7 @@ This gate is mandatory before opening Nikki to the public internet on the single
 | Re-login works | Existing user can log in again after logout |
 | Password change works | Existing user can change their password from Settings; current and other active sessions are invalidated and the user can log in again with the new password |
 | Security history works | Owner Settings shows recent audit events for login failure/success, password change, account deletion, setup restore, export, entry deletion, and image deletion without diary content or secrets |
+| Automated production smoke passes | `sh ./scripts/smoke-production.sh` passes with `NIKKI_SMOKE_BASE_URL`, `NIKKI_SMOKE_USERNAME`, and `NIKKI_SMOKE_PASSWORD` set in a private shell; set `NIKKI_SMOKE_RUN_PASSWORD_CHANGE=true` and `NIKKI_SMOKE_RUN_BACKUP=true` only when the operator accepts those side effects |
 | Entry create/edit works | Create a diary entry, edit it, refresh, and confirm persisted content |
 | Memory shelf works | Confirm Today shows past entries for the signed-in user, `tired` and `sad` are hidden by default for new browser preferences, collapse/expand does not disable the feature, and opening a memory shows a direct return to Today |
 | Image upload/display/delete works | Upload an image, confirm it displays in reader and editor, delete it through the editor, and confirm it no longer displays |
