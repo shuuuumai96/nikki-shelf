@@ -259,6 +259,18 @@ Production Compose uses `.env.production`. Do not commit `.env.production`. For 
 
 Security history is stored in PostgreSQL as bounded audit events and is visible only to owner accounts. It records event names, outcome, actor metadata, target IDs, reason codes, request IDs, remote IPs, and small operational metadata; it does not store diary title/body/tags, passwords, cookies, CSRF tokens, session tokens, request bodies, upload file paths, or SQL arguments. `NIKKI_AUDIT_RETENTION_DAYS` controls retention and defaults to 180 days.
 
+Production smoke testing can be run from the deployment checkout after the owner account exists:
+
+```bash
+export NIKKI_SMOKE_BASE_URL=https://your-real-domain.example
+export NIKKI_SMOKE_USERNAME=owner
+read -rs NIKKI_SMOKE_PASSWORD
+export NIKKI_SMOKE_PASSWORD
+sh ./scripts/smoke-production.sh
+```
+
+The smoke script creates and deletes one disposable diary entry and one tiny image. Password-change and operational-backup checks are opt-in because they intentionally change credentials or create sensitive backup artifacts.
+
 Uploaded images are served from local upload storage in the current single-host design. S3, if used, is for encrypted backup artifacts only, not as the image-serving backend.
 
 Deployment and release documents:
