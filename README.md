@@ -30,6 +30,7 @@ Public exposure requires careful production configuration, access control, and b
 - basic past-entry search
 - random memory shelf for revisiting older entries
 - password change with full session revocation
+- owner-visible security history for authentication, destructive, restore, and export events
 - normal autosave for single-tab writing
 - stale-version conflict fallback
 - desktop-supported image attachments
@@ -190,7 +191,7 @@ docker compose up -d
 
 Diary data is personal and not reproducible if lost. Nikki data lives in two places:
 
-- PostgreSQL: users, sessions, diary entries, tags, moods, image metadata, and settings
+- PostgreSQL: users, sessions, audit events, diary entries, tags, moods, image metadata, and settings
 - Upload storage: image files referenced by database metadata
 
 Back up the database and uploads from the same point in time. The app-level backup archive is useful for export and inspection, but it is not an automated database restore or import path.
@@ -255,6 +256,8 @@ See [docs/BACKUP_RESTORE.md](docs/BACKUP_RESTORE.md) for cleanup and repair deta
 Nikki can be operated in local, private, or public single-instance environments. Public exposure requires the operator to apply the production configuration, access controls, and backup/restore practices documented in this repository. The README is not a deployment runbook; use the linked operational docs for host-specific steps.
 
 Production Compose uses `.env.production`. Do not commit `.env.production`. For HTTPS production, use secure cookies, exact CORS origins, disabled public signup, and a long random `NIKKI_FIRST_USER_BOOTSTRAP_TOKEN`. The `/setup` screen is available only while the database has no users, and owner creation or operational backup restore through it still requires the token. If possible, keep the instance behind a Security Group, VPN, SSM tunnel, or Tailscale-style private path until setup is complete. Backend and PostgreSQL ports must not be publicly exposed. See [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for production-relevant environment variables.
+
+Security history is stored in PostgreSQL as bounded audit events and is visible only to owner accounts. It records event names, outcome, actor metadata, target IDs, reason codes, request IDs, remote IPs, and small operational metadata; it does not store diary title/body/tags, passwords, cookies, CSRF tokens, session tokens, request bodies, upload file paths, or SQL arguments. `NIKKI_AUDIT_RETENTION_DAYS` controls retention and defaults to 180 days.
 
 Uploaded images are served from local upload storage in the current single-host design. S3, if used, is for encrypted backup artifacts only, not as the image-serving backend.
 

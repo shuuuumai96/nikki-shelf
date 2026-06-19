@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onMounted, ref } from "vue";
+import { computed, defineAsyncComponent, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import type {
   AuthUser,
@@ -18,6 +18,9 @@ import {
 } from "../../features/entries/composables/useEntrySurfaceMode";
 import type { useEntryStore } from "../../features/entries/store";
 import type { Entry, EntryInput } from "../../features/entries/types";
+import { listAuditEvents } from "../../features/settings/api";
+import type { AuditEvent } from "../../features/settings/types";
+import { localizedErrorMessage } from "../api/client";
 import { useWritingShortcuts } from "../composables/useWritingShortcuts";
 import { todayISO } from "../utils/date";
 import AppSidebar from "./AppSidebar.vue";
@@ -51,10 +54,15 @@ const view = ref("today");
 const entriesMode = ref<"list" | "archive">("list");
 const todayView = ref<DiaryEditorHandle | null>(null);
 const memoryJourneyActive = ref(false);
+const securityEvents = ref<AuditEvent[]>([]);
+const securityEventsLoaded = ref(false);
+const securityEventsLoading = ref(false);
+const securityEventsError = ref("");
 const selectedId = computed(() => props.store.activeEntry?.id);
 const showReturnToToday = computed(
   () => memoryJourneyActive.value && props.store.activeDate !== todayISO(),
 );
+const canLoadSecurityEvents = computed(() => props.user.role === "owner");
 
 const { entrySurfaceMode, resolveEntrySurfaceMode, setEntrySurfaceMode } =
   useEntrySurfaceMode();
@@ -72,6 +80,15 @@ onMounted(() => {
   );
   preloadNavigationViews();
 });
+
+watch(
+  () => [view.value, props.user.id] as const,
+  () => {
+    if (view.value === "settings" && canLoadSecurityEvents.value) {
+      void loadSecurityEvents();
+    }
+  },
+);
 
 useWritingShortcuts({
   canUseShortcuts: () => true,
@@ -172,6 +189,26 @@ function preloadNavigationViews() {
     loadSettingsPanel(),
   ]).catch(() => {});
 }
+
+async function loadSecurityEvents(force = false) {
+  if (!canLoadSecurityEvents.value || securityEventsLoading.value) {
+    return;
+  }
+  if (securityEventsLoaded.value && !force) {
+    return;
+  }
+
+  securityEventsLoading.value = true;
+  securityEventsError.value = "";
+  try {
+    securityEvents.value = (await listAuditEvents()).items;
+    securityEventsLoaded.value = true;
+  } catch (error) {
+    securityEventsError.value = localizedErrorMessage(error);
+  } finally {
+    securityEventsLoading.value = false;
+  }
+}
 </script>
 
 <template>
@@ -243,9 +280,13 @@ function preloadNavigationViews() {
         :error="authError"
         :user="user"
         :loading="authLoading"
+        :security-events="securityEvents"
+        :security-events-error="securityEventsError"
+        :security-events-loading="securityEventsLoading"
         @change-password="emit('changePassword', $event)"
         @delete-account="emit('deleteAccount', $event)"
         @logout="emit('logout')"
+        @refresh-security-events="loadSecurityEvents(true)"
       />
     </main>
   </div>

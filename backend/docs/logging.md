@@ -4,6 +4,7 @@
 
 - Make backend behavior observable from Docker logs without adding an external logging service.
 - Use structured logs so request, user, route, and error context can be searched later.
+- Persist a bounded security history for events that must be reviewed after Docker logs have rotated.
 - Keep private diary data out of logs.
 - Add logging through shared HTTP and app boundaries first, instead of scattering ad-hoc prints through handlers.
 
@@ -33,14 +34,14 @@ Log exactly one record per request after the handler finishes.
 
 Fields:
 
-- `request_id`: from `X-Request-ID`, generated when absent.
+- `request_id`: from `X-Request-ID` when it is a bounded printable value, generated when absent or invalid.
 - `method`: HTTP method.
 - `route`: Echo route pattern, for example `/api/entries/:id`.
 - `status`: response status code.
 - `duration_ms`: request duration in milliseconds.
 - `bytes_in`: request content length when known.
 - `bytes_out`: response size.
-- `remote_ip`: client IP from Echo.
+- `remote_ip`: client IP from the configured trusted-proxy extractor.
 - `user_id`: authenticated user id when available.
 - `error_kind`: stable app error code when available.
 
@@ -112,6 +113,20 @@ Recommended events:
 
 Avoid logging entry title, body, markdown, tags, mood notes, image original filename, generated storage path, passwords, session tokens, cookies, and full SQL arguments.
 
+## Persistent Audit Events
+
+`audit_events` stores the subset of events that need later investigation from the owner Settings screen:
+
+- authentication success/failure, logout, password change, account deletion, and CSRF failure
+- setup owner creation and setup restore verification/completion/failure
+- export completion, entry deletion, and image deletion
+
+Audit rows include event type, outcome, actor id/name/role when known, target type/id, reason code, request id, remote IP, small operational metadata, and creation time. Audit remote IP extraction follows the same trusted-proxy configuration used by auth rate limiting. Rows must not include diary title/body/markdown/tags, passwords, cookies, CSRF tokens, session tokens, request bodies, generated upload paths, or raw SQL arguments.
+
+Rate-limit denials are written to structured stdout logs but are intentionally not persisted to `audit_events`. This avoids turning an active brute-force or spray attempt into unbounded database write amplification; the authentication failures before lockout remain persisted.
+
+`NIKKI_AUDIT_RETENTION_DAYS` controls retention and defaults to 180 days. The backend prunes old audit rows on startup after schema migration.
+
 ## Database and Storage Failures
 
 Do not log every SQL query by default. Start with unexpected error logs at the request boundary, then add targeted logs only when diagnosing a recurring issue.
@@ -173,4 +188,5 @@ Add focused tests for:
 2. Convert 500 paths to `httpx.Internal`.
 3. Add stable `error_kind` metadata for known app errors.
 4. Add domain event logs for auth, entries, images, and export.
-5. Tune noisy 4xx logs after observing real Docker logs.
+5. Persist the minimal owner-visible audit event subset with bounded retention.
+6. Tune noisy 4xx logs after observing real Docker logs.

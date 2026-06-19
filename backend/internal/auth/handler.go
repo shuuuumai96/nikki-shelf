@@ -12,6 +12,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 
+	"github.com/shuuuumai96/nikki-shelf/backend/internal/audit"
 	"github.com/shuuuumai96/nikki-shelf/backend/internal/httpx"
 	"github.com/shuuuumai96/nikki-shelf/backend/internal/logx"
 )
@@ -24,11 +25,15 @@ type Handler struct {
 	service      *Service
 	cookieSecure bool
 	rateLimiter  *RateLimiter
+	audit        *audit.Service
+	clientIP     func(*http.Request) string
 }
 
 type HandlerConfig struct {
 	CookieSecure bool
 	RateLimiter  *RateLimiter
+	Audit        *audit.Service
+	ClientIP     func(*http.Request) string
 }
 
 func NewHandler(service *Service, configs ...HandlerConfig) *Handler {
@@ -36,10 +41,15 @@ func NewHandler(service *Service, configs ...HandlerConfig) *Handler {
 	if len(configs) > 0 {
 		cfg = configs[0]
 	}
+	if cfg.ClientIP == nil {
+		cfg.ClientIP = NewClientIPExtractor("direct", nil).ClientIP
+	}
 	return &Handler{
 		service:      service,
 		cookieSecure: cfg.CookieSecure,
 		rateLimiter:  cfg.RateLimiter,
+		audit:        cfg.Audit,
+		clientIP:     cfg.ClientIP,
 	}
 }
 
@@ -47,10 +57,10 @@ func (h *Handler) Register(api *echo.Group) {
 	api.GET("/auth/config", h.config)
 	api.POST("/auth/signup", h.signup)
 	api.POST("/auth/login", h.login)
-	api.POST("/auth/logout", h.logout, CSRF(h.service))
+	api.POST("/auth/logout", h.logout, CSRF(h.service, CSRFConfig{Audit: h.audit}))
 	api.GET("/auth/me", h.me)
-	api.PUT("/auth/me/password", h.changePassword, Require(h.service), CSRF(h.service))
-	api.DELETE("/auth/me", h.deleteMe, Require(h.service), CSRF(h.service))
+	api.PUT("/auth/me/password", h.changePassword, Require(h.service), CSRF(h.service, CSRFConfig{Audit: h.audit}))
+	api.DELETE("/auth/me", h.deleteMe, Require(h.service), CSRF(h.service, CSRFConfig{Audit: h.audit}))
 	api.GET("/setup/status", h.setupStatus)
 	api.POST("/setup/owner", h.setupOwner)
 	api.POST("/setup/restore/verify", h.setupRestoreVerify)
@@ -86,7 +96,7 @@ func (h *Handler) setupStatus(c echo.Context) error {
 func (h *Handler) setupOwner(c echo.Context) error {
 	input := SetupOwnerInput{}
 	if err := httpx.DecodeJSONWithLimit(c, &input, httpx.AuthJSONLimitBytes); err != nil {
-		logSetupFailure(c, "invalid_input")
+		h.logSetupFailure(c, "invalid_input")
 		if errors.Is(err, httpx.ErrRequestTooLarge) {
 			return httpx.ErrorWithKind(c, http.StatusRequestEntityTooLarge, "request JSON is too large", "request.too_large")
 		}
@@ -94,7 +104,8 @@ func (h *Handler) setupOwner(c echo.Context) error {
 	}
 
 	if h.rateLimiter != nil && !h.rateLimiter.Allow(c, input.Username) {
-		logSetupFailure(c, "rate_limited")
+		h.logSetupFailure(c, "rate_limited")
+		h.logRateLimited(c, input.Username, "setup.owner")
 		return rateLimitError(c)
 	}
 
@@ -103,7 +114,13 @@ func (h *Handler) setupOwner(c echo.Context) error {
 		if h.rateLimiter != nil {
 			h.rateLimiter.RecordFailure(c, input.Username)
 		}
-		logSetupFailure(c, setupFailureReason(err))
+		h.logSetupFailure(c, setupFailureReason(err))
+		h.recordAudit(c, audit.Event{
+			EventType:     "setup.owner_create_failed",
+			Outcome:       audit.OutcomeFailed,
+			ActorUsername: auditUsername(input.Username),
+			ReasonKind:    setupFailureReason(err),
+		})
 		return setupError(c, err)
 	}
 	if h.rateLimiter != nil {
@@ -115,21 +132,23 @@ func (h *Handler) setupOwner(c echo.Context) error {
 	logx.Event(c, "setup.owner_created",
 		slog.Int64("user_id", session.User.ID),
 		slog.String("username", session.User.Username),
-		slog.String("remote_ip", c.RealIP()),
+		slog.String("remote_ip", h.remoteIP(c)),
 	)
+	h.recordUserAudit(c, "setup.owner_created", session.User, audit.OutcomeSucceeded, "", nil)
 	return httpx.JSON(c, http.StatusOK, session.User)
 }
 
 func (h *Handler) setupRestoreVerify(c echo.Context) error {
 	upload, err := parseSetupRestoreUpload(c)
 	if err != nil {
-		logSetupRestoreFailure(c, "invalid_input")
+		h.logSetupRestoreFailure(c, "invalid_input")
 		return setupRestoreUploadError(c, err)
 	}
 	defer upload.cleanup()
 
 	if h.rateLimiter != nil && !h.rateLimiter.Allow(c, "setup-restore") {
-		logSetupRestoreFailure(c, "rate_limited")
+		h.logSetupRestoreFailure(c, "rate_limited")
+		h.logRateLimited(c, "setup-restore", "setup.restore")
 		return rateLimitError(c)
 	}
 
@@ -142,26 +161,37 @@ func (h *Handler) setupRestoreVerify(c echo.Context) error {
 		if h.rateLimiter != nil {
 			h.rateLimiter.RecordFailure(c, "setup-restore")
 		}
-		logSetupRestoreFailure(c, setupRestoreFailureReason(err))
+		h.logSetupRestoreFailure(c, setupRestoreFailureReason(err))
+		h.recordSetupRestoreAudit(c, audit.OutcomeFailed, setupRestoreFailureReason(err), nil)
 		return setupError(c, err)
 	}
 	if h.rateLimiter != nil {
 		h.rateLimiter.RecordSuccess(c, "setup-restore")
 	}
 
+	h.recordAudit(c, audit.Event{
+		EventType: "setup.restore_verified",
+		Outcome:   audit.OutcomeSucceeded,
+		Metadata: audit.Metadata(
+			"entry_count", result.EntryCount,
+			"image_count", result.ImageCount,
+			"backup_size_bytes", result.BackupSizeBytes,
+		),
+	})
 	return httpx.JSON(c, http.StatusOK, result)
 }
 
 func (h *Handler) setupRestore(c echo.Context) error {
 	upload, err := parseSetupRestoreUpload(c)
 	if err != nil {
-		logSetupRestoreFailure(c, "invalid_input")
+		h.logSetupRestoreFailure(c, "invalid_input")
 		return setupRestoreUploadError(c, err)
 	}
 	defer upload.cleanup()
 
 	if h.rateLimiter != nil && !h.rateLimiter.Allow(c, "setup-restore") {
-		logSetupRestoreFailure(c, "rate_limited")
+		h.logSetupRestoreFailure(c, "rate_limited")
+		h.logRateLimited(c, "setup-restore", "setup.restore")
 		return rateLimitError(c)
 	}
 
@@ -175,7 +205,8 @@ func (h *Handler) setupRestore(c echo.Context) error {
 		if h.rateLimiter != nil {
 			h.rateLimiter.RecordFailure(c, "setup-restore")
 		}
-		logSetupRestoreFailure(c, setupRestoreFailureReason(err))
+		h.logSetupRestoreFailure(c, setupRestoreFailureReason(err))
+		h.recordSetupRestoreAudit(c, audit.OutcomeFailed, setupRestoreFailureReason(err), nil)
 		return setupError(c, err)
 	}
 	if h.rateLimiter != nil {
@@ -185,8 +216,12 @@ func (h *Handler) setupRestore(c echo.Context) error {
 	logx.Event(c, "setup.restore_completed",
 		slog.Int("entry_count", result.EntryCount),
 		slog.Int("image_count", result.ImageCount),
-		slog.String("remote_ip", c.RealIP()),
+		slog.String("remote_ip", h.remoteIP(c)),
 	)
+	h.recordSetupRestoreAudit(c, audit.OutcomeSucceeded, "", audit.Metadata(
+		"entry_count", result.EntryCount,
+		"image_count", result.ImageCount,
+	))
 	return httpx.JSON(c, http.StatusOK, result)
 }
 
@@ -200,6 +235,7 @@ func (h *Handler) start(c echo.Context, event string, start func(context.Context
 	}
 
 	if h.rateLimiter != nil && !h.rateLimiter.Allow(c, input.Username) {
+		h.logRateLimited(c, input.Username, event)
 		return rateLimitError(c)
 	}
 
@@ -208,6 +244,12 @@ func (h *Handler) start(c echo.Context, event string, start func(context.Context
 		if h.rateLimiter != nil {
 			h.rateLimiter.RecordFailure(c, input.Username)
 		}
+		h.recordAudit(c, audit.Event{
+			EventType:     authFailureEvent(event),
+			Outcome:       audit.OutcomeFailed,
+			ActorUsername: auditUsername(input.Username),
+			ReasonKind:    KindFor(err),
+		})
 		return authError(c, err)
 	}
 	if h.rateLimiter != nil {
@@ -217,6 +259,7 @@ func (h *Handler) start(c echo.Context, event string, start func(context.Context
 	setSessionCookie(c, session, h.cookieSecure)
 	logx.SetUserID(c, session.User.ID)
 	logx.Event(c, event, slog.Int64("user_id", session.User.ID))
+	h.recordUserAudit(c, event, session.User, audit.OutcomeSucceeded, "", nil)
 	return httpx.JSON(c, http.StatusOK, session.User)
 }
 
@@ -245,6 +288,7 @@ func (h *Handler) logout(c echo.Context) error {
 
 	clearSessionCookie(c, h.cookieSecure)
 	logx.Event(c, "auth.logout_succeeded")
+	h.recordAudit(c, audit.Event{EventType: "auth.logout_succeeded", Outcome: audit.OutcomeSucceeded})
 	return httpx.NoContent(c)
 }
 
@@ -264,6 +308,7 @@ func (h *Handler) changePassword(c echo.Context) error {
 
 	rateKey := user.Username
 	if h.rateLimiter != nil && !h.rateLimiter.Allow(c, rateKey) {
+		h.logRateLimited(c, rateKey, "auth.password_changed")
 		return rateLimitError(c)
 	}
 
@@ -271,6 +316,7 @@ func (h *Handler) changePassword(c echo.Context) error {
 		if h.rateLimiter != nil {
 			h.rateLimiter.RecordFailure(c, rateKey)
 		}
+		h.recordUserAudit(c, "auth.password_change_failed", user, audit.OutcomeFailed, KindFor(err), nil)
 		return authError(c, err)
 	}
 	if h.rateLimiter != nil {
@@ -279,6 +325,7 @@ func (h *Handler) changePassword(c echo.Context) error {
 
 	clearSessionCookie(c, h.cookieSecure)
 	logx.Event(c, "auth.password_changed", slog.Int64("user_id", user.ID))
+	h.recordUserAudit(c, "auth.password_changed", user, audit.OutcomeSucceeded, "", nil)
 	return httpx.NoContent(c)
 }
 
@@ -301,6 +348,7 @@ func (h *Handler) deleteMe(c echo.Context) error {
 		rateKey = user.Username
 	}
 	if h.rateLimiter != nil && !h.rateLimiter.Allow(c, rateKey) {
+		h.logRateLimited(c, rateKey, "auth.account_deleted")
 		return rateLimitError(c)
 	}
 
@@ -309,6 +357,7 @@ func (h *Handler) deleteMe(c echo.Context) error {
 		if h.rateLimiter != nil {
 			h.rateLimiter.RecordFailure(c, rateKey)
 		}
+		h.recordUserAudit(c, "auth.account_delete_failed", user, audit.OutcomeFailed, KindFor(err), nil)
 		return authError(c, err)
 	}
 	if h.rateLimiter != nil {
@@ -320,6 +369,7 @@ func (h *Handler) deleteMe(c echo.Context) error {
 		slog.Int64("user_id", user.ID),
 		slog.Int("remaining_users", result.RemainingUsers),
 	)
+	h.recordUserAudit(c, "auth.account_deleted", user, audit.OutcomeSucceeded, "", audit.Metadata("remaining_users", result.RemainingUsers))
 	return httpx.NoContent(c)
 }
 
@@ -342,13 +392,25 @@ func Require(service *Service) echo.MiddlewareFunc {
 	}
 }
 
-func CSRF(service *Service) echo.MiddlewareFunc {
-	return csrfWithValidator(func(ctx context.Context, sessionToken string, csrfToken string) bool {
-		return service != nil && service.ValidateCSRF(ctx, sessionToken, csrfToken)
-	})
+type CSRFConfig struct {
+	Audit *audit.Service
 }
 
-func csrfWithValidator(validate func(context.Context, string, string) bool) echo.MiddlewareFunc {
+func CSRF(service *Service, configs ...CSRFConfig) echo.MiddlewareFunc {
+	cfg := CSRFConfig{}
+	if len(configs) > 0 {
+		cfg = configs[0]
+	}
+	return csrfWithValidator(func(ctx context.Context, sessionToken string, csrfToken string) bool {
+		return service != nil && service.ValidateCSRF(ctx, sessionToken, csrfToken)
+	}, cfg)
+}
+
+func csrfWithValidator(validate func(context.Context, string, string) bool, configs ...CSRFConfig) echo.MiddlewareFunc {
+	cfg := CSRFConfig{}
+	if len(configs) > 0 {
+		cfg = configs[0]
+	}
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			// Reads are authenticated by the HttpOnly session cookie; mutating
@@ -360,6 +422,7 @@ func csrfWithValidator(validate func(context.Context, string, string) bool) echo
 
 			token, err := sessionToken(c)
 			if err != nil || !validate(c.Request().Context(), token, c.Request().Header.Get("X-CSRF-Token")) {
+				recordCSRFFailure(c, cfg.Audit)
 				return httpx.ErrorWithKind(c, http.StatusForbidden, "check the request", "auth.csrf")
 			}
 			return next(c)
@@ -417,10 +480,10 @@ func setupFailureReason(err error) string {
 	}
 }
 
-func logSetupFailure(c echo.Context, reason string) {
+func (h *Handler) logSetupFailure(c echo.Context, reason string) {
 	logx.Event(c, "setup.owner_create_failed",
 		slog.String("reason_kind", reason),
-		slog.String("remote_ip", c.RealIP()),
+		slog.String("remote_ip", h.remoteIP(c)),
 	)
 }
 
@@ -441,11 +504,97 @@ func setupRestoreFailureReason(err error) string {
 	}
 }
 
-func logSetupRestoreFailure(c echo.Context, reason string) {
+func (h *Handler) logSetupRestoreFailure(c echo.Context, reason string) {
 	logx.Event(c, "setup.restore_failed",
 		slog.String("reason_kind", reason),
-		slog.String("remote_ip", c.RealIP()),
+		slog.String("remote_ip", h.remoteIP(c)),
 	)
+}
+
+func (h *Handler) recordAudit(c echo.Context, event audit.Event) {
+	if h.audit == nil {
+		return
+	}
+	h.audit.RecordHTTP(c, event)
+}
+
+func (h *Handler) recordUserAudit(c echo.Context, eventType string, user User, outcome string, reasonKind string, metadata map[string]string) {
+	h.recordAudit(c, audit.Event{
+		EventType:     eventType,
+		Outcome:       outcome,
+		ActorUserID:   audit.UserID(user.ID),
+		ActorUsername: user.Username,
+		ActorRole:     user.Role,
+		ReasonKind:    reasonKind,
+		Metadata:      metadata,
+	})
+}
+
+func (h *Handler) recordSetupRestoreAudit(c echo.Context, outcome string, reasonKind string, metadata map[string]string) {
+	eventType := "setup.restore_completed"
+	if outcome != audit.OutcomeSucceeded {
+		eventType = "setup.restore_failed"
+	}
+	h.recordAudit(c, audit.Event{
+		EventType:  eventType,
+		Outcome:    outcome,
+		ReasonKind: reasonKind,
+		Metadata:   metadata,
+	})
+}
+
+func (h *Handler) logRateLimited(c echo.Context, username string, flow string) {
+	logx.Event(c, "auth.rate_limited",
+		slog.String("flow", flow),
+		slog.String("username", auditUsername(username)),
+		slog.String("remote_ip", h.remoteIP(c)),
+	)
+}
+
+func (h *Handler) remoteIP(c echo.Context) string {
+	if h.clientIP == nil {
+		return NewClientIPExtractor("direct", nil).ClientIP(c.Request())
+	}
+	return h.clientIP(c.Request())
+}
+
+func recordCSRFFailure(c echo.Context, auditService *audit.Service) {
+	if auditService == nil {
+		return
+	}
+	user, ok := UserFromContext(c)
+	if !ok {
+		return
+	}
+	event := audit.Event{
+		EventType:     "auth.csrf_failed",
+		Outcome:       audit.OutcomeFailed,
+		ReasonKind:    "auth.csrf",
+		ActorUserID:   audit.UserID(user.ID),
+		ActorUsername: user.Username,
+		ActorRole:     user.Role,
+	}
+	auditService.RecordHTTP(c, event)
+}
+
+func authFailureEvent(event string) string {
+	switch event {
+	case "auth.login_succeeded":
+		return "auth.login_failed"
+	case "auth.signup_succeeded":
+		return "auth.signup_failed"
+	default:
+		return event + "_failed"
+	}
+}
+
+func auditUsername(username string) string {
+	value := strings.ToLower(strings.TrimSpace(strings.ReplaceAll(strings.ReplaceAll(username, "\n", " "), "\r", " ")))
+	runes := []rune(value)
+	if len(runes) > 64 {
+		return string(runes[:64])
+	}
+	return value
 }
 
 type setupRestoreUpload struct {

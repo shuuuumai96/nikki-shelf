@@ -68,6 +68,66 @@ func TestMiddlewareLogsRequestFields(t *testing.T) {
 	}
 }
 
+func TestRequestIDMiddlewareRejectsOversizedHeader(t *testing.T) {
+	buffer := bytes.Buffer{}
+	server := newServer(&buffer)
+	server.GET("/things", func(c echo.Context) error {
+		return c.NoContent(http.StatusOK)
+	})
+
+	oversized := strings.Repeat("a", 256)
+	request := httptest.NewRequest(http.MethodGet, "/things", nil)
+	request.Header.Set("X-Request-ID", oversized)
+	response := httptest.NewRecorder()
+	server.ServeHTTP(response, request)
+
+	if response.Header().Get("X-Request-ID") == oversized {
+		t.Fatal("oversized request id was echoed back")
+	}
+	record := decodeLog(t, buffer.String())
+	if got := record["request_id"]; got == oversized || got == "" {
+		t.Fatalf("request_id = %#v, want generated bounded id", got)
+	}
+}
+
+func TestMiddlewareIgnoresForwardedHeaderByDefault(t *testing.T) {
+	buffer := bytes.Buffer{}
+	server := newServer(&buffer)
+	server.GET("/things", func(c echo.Context) error {
+		return c.NoContent(http.StatusOK)
+	})
+
+	request := httptest.NewRequest(http.MethodGet, "/things", nil)
+	request.RemoteAddr = "198.51.100.10:1234"
+	request.Header.Set("X-Forwarded-For", "203.0.113.99")
+	response := httptest.NewRecorder()
+	server.ServeHTTP(response, request)
+
+	record := decodeLog(t, buffer.String())
+	assertField(t, record, "remote_ip", "198.51.100.10")
+}
+
+func TestMiddlewareUsesConfiguredRemoteIP(t *testing.T) {
+	buffer := bytes.Buffer{}
+	server := echo.New()
+	logger := slog.New(slog.NewJSONHandler(&buffer, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	server.Use(logx.RequestIDMiddleware())
+	server.Use(logx.MiddlewareWithRemoteIP(logger, func(*http.Request) string {
+		return "203.0.113.20"
+	}))
+	server.GET("/things", func(c echo.Context) error {
+		return c.NoContent(http.StatusOK)
+	})
+
+	request := httptest.NewRequest(http.MethodGet, "/things", nil)
+	request.RemoteAddr = "198.51.100.10:1234"
+	response := httptest.NewRecorder()
+	server.ServeHTTP(response, request)
+
+	record := decodeLog(t, buffer.String())
+	assertField(t, record, "remote_ip", "203.0.113.20")
+}
+
 func TestInternalErrorLogsOriginalErrorButHidesResponse(t *testing.T) {
 	buffer := bytes.Buffer{}
 	server := newServer(&buffer)

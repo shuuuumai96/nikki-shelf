@@ -100,6 +100,7 @@ Production requirements are summarized here; see `docs/CONFIGURATION.md` for pur
 - `NIKKI_CORS_ALLOWED_ORIGINS` must match the exact public HTTPS origin.
 - Signup should stay closed for public production. First setup is a separate token-gated empty-database flow for owner creation or operational backup restore.
 - `NIKKI_FIRST_USER_BOOTSTRAP_TOKEN` must be a long random secret before an empty database is exposed publicly.
+- `NIKKI_AUDIT_RETENTION_DAYS` must be a positive bounded value.
 - `NIKKI_STRIP_IMAGE_METADATA=true` is expected for production.
 - `.env.production` must not be committed.
 

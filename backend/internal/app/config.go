@@ -26,6 +26,7 @@ type Config struct {
 	AuthRateLimitWindow          time.Duration
 	AuthRateLimitLockout         time.Duration
 	AuthRateLimitMaxEntries      int
+	AuditRetentionDays           int
 	IPExtractorMode              string
 	TrustedProxyCIDRs            []string
 	StripImageMetadata           bool
@@ -57,6 +58,7 @@ func LoadConfig() Config {
 		AuthRateLimitWindow:          durationEnv("NIKKI_AUTH_RATE_LIMIT_WINDOW", 5*time.Minute),
 		AuthRateLimitLockout:         durationEnv("NIKKI_AUTH_RATE_LIMIT_LOCKOUT", 15*time.Minute),
 		AuthRateLimitMaxEntries:      intEnv("NIKKI_AUTH_RATE_LIMIT_MAX_ENTRIES", 2048),
+		AuditRetentionDays:           positiveIntEnv("NIKKI_AUDIT_RETENTION_DAYS", 180),
 		IPExtractorMode:              env("NIKKI_IP_EXTRACTOR_MODE", "direct"),
 		TrustedProxyCIDRs:            listEnv("NIKKI_TRUSTED_PROXY_CIDRS", nil),
 		StripImageMetadata:           boolEnv("NIKKI_STRIP_IMAGE_METADATA", false),
@@ -117,6 +119,22 @@ func nonNegativeIntEnv(key string, fallback int) int {
 	}
 	if parsed < 0 {
 		panic("invalid " + key + ": must not be negative")
+	}
+	return parsed
+}
+
+func positiveIntEnv(key string, fallback int) int {
+	value, ok := os.LookupEnv(key)
+	if !ok || strings.TrimSpace(value) == "" {
+		return fallback
+	}
+
+	parsed, err := strconv.Atoi(strings.TrimSpace(value))
+	if err != nil {
+		panic("invalid " + key + ": must be a positive integer")
+	}
+	if parsed <= 0 {
+		panic("invalid " + key + ": must be positive")
 	}
 	return parsed
 }

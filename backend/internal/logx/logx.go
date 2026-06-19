@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"runtime/debug"
@@ -16,7 +17,8 @@ import (
 )
 
 const (
-	requestIDHeader = "X-Request-ID"
+	requestIDHeader    = "X-Request-ID"
+	maxRequestIDLength = 128
 
 	errorKey     = "log.error"
 	errorKindKey = "log.error_kind"
@@ -60,6 +62,7 @@ func RequestIDMiddleware() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			requestID := strings.TrimSpace(c.Request().Header.Get(requestIDHeader))
+			requestID = normalizeRequestID(requestID)
 			if requestID == "" {
 				requestID = newRequestID()
 			}
@@ -72,8 +75,15 @@ func RequestIDMiddleware() echo.MiddlewareFunc {
 }
 
 func Middleware(logger *slog.Logger) echo.MiddlewareFunc {
+	return MiddlewareWithRemoteIP(logger, directRemoteIP)
+}
+
+func MiddlewareWithRemoteIP(logger *slog.Logger, remoteIP func(*http.Request) string) echo.MiddlewareFunc {
 	if logger == nil {
 		logger = slog.Default()
+	}
+	if remoteIP == nil {
+		remoteIP = directRemoteIP
 	}
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
@@ -94,7 +104,7 @@ func Middleware(logger *slog.Logger) echo.MiddlewareFunc {
 			}
 
 			duration := time.Since(startedAt)
-			attrs := requestAttrs(c, status, duration)
+			attrs := requestAttrs(c, status, duration, remoteIP)
 			attrs = append(attrs, ErrorAttrs(c)...)
 			if status >= http.StatusInternalServerError && err != nil && Error(c) == nil {
 				attrs = append(attrs, slog.String("error", err.Error()))
@@ -204,7 +214,7 @@ func Event(c echo.Context, event string, attrs ...slog.Attr) {
 	logger.LogAttrs(c.Request().Context(), slog.LevelInfo, event, eventAttrs...)
 }
 
-func requestAttrs(c echo.Context, status int, duration time.Duration) []slog.Attr {
+func requestAttrs(c echo.Context, status int, duration time.Duration, remoteIP func(*http.Request) string) []slog.Attr {
 	request := c.Request()
 	attrs := []slog.Attr{
 		slog.String("request_id", RequestID(c)),
@@ -213,7 +223,7 @@ func requestAttrs(c echo.Context, status int, duration time.Duration) []slog.Att
 		slog.Int("status", status),
 		slog.Int64("duration_ms", duration.Milliseconds()),
 		slog.Int64("bytes_out", c.Response().Size),
-		slog.String("remote_ip", c.RealIP()),
+		slog.String("remote_ip", remoteIP(request)),
 	}
 
 	if request.ContentLength >= 0 {
@@ -224,6 +234,21 @@ func requestAttrs(c echo.Context, status int, duration time.Duration) []slog.Att
 	}
 
 	return attrs
+}
+
+func directRemoteIP(request *http.Request) string {
+	if request == nil {
+		return "unknown"
+	}
+	host, _, err := net.SplitHostPort(strings.TrimSpace(request.RemoteAddr))
+	if err != nil {
+		host = strings.TrimSpace(request.RemoteAddr)
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return "unknown"
+	}
+	return ip.String()
 }
 
 func requestLevel(c echo.Context, status int, duration time.Duration) slog.Level {
@@ -244,6 +269,19 @@ func route(c echo.Context) string {
 		return path
 	}
 	return c.Request().URL.Path
+}
+
+func normalizeRequestID(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" || len(value) > maxRequestIDLength {
+		return ""
+	}
+	for _, char := range value {
+		if char < 33 || char > 126 {
+			return ""
+		}
+	}
+	return value
 }
 
 func newRequestID() string {

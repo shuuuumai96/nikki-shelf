@@ -71,6 +71,9 @@ printf '%s\n' "${frontend_block}" | grep -Eq 'host_ip: 127\.0\.0\.1' || fail "fr
 [ "$(env_value "${backend_block}" NIKKI_AUTH_RATE_LIMIT_IP_ATTEMPTS)" != "" ] || fail "NIKKI_AUTH_RATE_LIMIT_IP_ATTEMPTS is missing"
 [ "$(env_value "${backend_block}" NIKKI_AUTH_RATE_LIMIT_ACCOUNT_ATTEMPTS)" != "" ] || fail "NIKKI_AUTH_RATE_LIMIT_ACCOUNT_ATTEMPTS is missing"
 [ "$(env_value "${backend_block}" NIKKI_AUTH_RATE_LIMIT_WINDOW)" != "" ] || fail "NIKKI_AUTH_RATE_LIMIT_WINDOW is missing"
+audit_retention_days="$(env_value "${backend_block}" NIKKI_AUDIT_RETENTION_DAYS)"
+[ "${audit_retention_days}" != "" ] || fail "NIKKI_AUDIT_RETENTION_DAYS is missing"
+printf '%s\n' "${audit_retention_days}" | grep -Eq '^[1-9][0-9]*$' || fail "NIKKI_AUDIT_RETENTION_DAYS must be a positive integer"
 
 cors_origins="$(env_value "${backend_block}" NIKKI_CORS_ALLOWED_ORIGINS)"
 [ "${cors_origins}" != "" ] || fail "NIKKI_CORS_ALLOWED_ORIGINS is missing"

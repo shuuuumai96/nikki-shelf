@@ -155,6 +155,55 @@ describe("SettingsPanel", () => {
 
     expect(wrapper.text()).not.toContain("current password is wrong");
   });
+
+  it("shows security history for owners", async () => {
+    const wrapper = mountPanel({
+      securityEvents: [
+        {
+          id: 1,
+          eventType: "auth.login_failed",
+          outcome: "failed",
+          actorUsername: "nikki",
+          reasonKind: "auth.invalid_credentials",
+          remoteIp: "127.0.0.1",
+          createdAt: "2026-06-13T10:00:00Z",
+        },
+      ],
+    });
+
+    expect(wrapper.text()).toContain("settings.securityHistory");
+    expect(wrapper.text()).toContain("settings.auditEvents.authLoginFailed");
+    expect(wrapper.text()).toContain("settings.securityReason");
+
+    await wrapper
+      .get('button[aria-label="settings.securityRefresh"]')
+      .trigger("click");
+
+    expect(wrapper.emitted("refreshSecurityEvents")).toHaveLength(1);
+  });
+
+  it("hides security history from non-owner users", () => {
+    const wrapper = mountPanel({
+      user: {
+        id: 2,
+        role: "user",
+        username: "nikki-user",
+      },
+      securityEvents: [
+        {
+          id: 1,
+          eventType: "auth.login_succeeded",
+          outcome: "succeeded",
+          createdAt: "2026-06-13T10:00:00Z",
+        },
+      ],
+    });
+
+    expect(wrapper.text()).not.toContain("settings.securityHistory");
+    expect(wrapper.text()).not.toContain(
+      "settings.auditEvents.authLoginSucceeded",
+    );
+  });
 });
 
 function mountPanel(

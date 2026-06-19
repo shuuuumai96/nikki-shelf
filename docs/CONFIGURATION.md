@@ -40,9 +40,19 @@ Uploads are user-owned diary data. Do not mount the uploads volume into a public
 
 | Variable | Purpose | Production expectation | Safe default where known | Misconfiguration risk |
 | --- | --- | --- | --- | --- |
-| `NIKKI_IP_EXTRACTOR_MODE` | Selects how the backend derives the client IP for rate limiting. | Use `direct` for the initial Caddy-to-frontend-to-backend chain. Use proxy-header modes only with verified trusted proxy CIDRs. | Code default is `direct`. | Trusting unverified proxy headers can let clients spoof IPs and weaken rate limiting. |
+| `NIKKI_IP_EXTRACTOR_MODE` | Selects how the backend derives the client IP for rate limiting, request logs, and audit events. | Use `direct` for the initial Caddy-to-frontend-to-backend chain. Use proxy-header modes only with verified trusted proxy CIDRs. | Code default is `direct`. | Trusting unverified proxy headers can let clients spoof IPs and weaken rate limiting or log integrity. |
 | `NIKKI_TRUSTED_PROXY_CIDRS` | Comma-separated CIDRs allowed to supply trusted proxy headers. | Leave empty with `direct`; otherwise set only the verified frontend/proxy network CIDR. | Empty by default. | Broad public CIDRs or guessed Docker ranges can make IP spoofing possible. |
 
 For the single-host deployment documented in this repository, Caddy should proxy only to the frontend container endpoint. Frontend nginx then proxies `/api/` and `/uploads/` to the backend according to `frontend/nginx/default.conf`.
 
 The auth rate limiter covers login, signup, `/api/setup/owner`, and setup restore verification/execution. Rate-limit responses intentionally do not reveal setup-token configuration or token validity.
+
+## Logging and Audit History
+
+| Variable | Purpose | Production expectation | Safe default where known | Misconfiguration risk |
+| --- | --- | --- | --- | --- |
+| `NIKKI_LOG_FORMAT` | Backend stdout log format. | Use `json` in containers. | Code default is `json`. | Text logs are harder to search after incidents. |
+| `NIKKI_LOG_LEVEL` | Backend stdout log level. | Keep `info` unless diagnosing a specific issue. | Code default is `info`. | Too noisy can hide important events; too quiet can obscure failures. |
+| `NIKKI_AUDIT_RETENTION_DAYS` | Retention window for database-backed security history. | Keep a bounded positive value such as `180`. | Code and production example default to `180`. | Too short can erase useful investigation history; too long retains operational metadata longer than needed. |
+
+Audit history is stored in `audit_events` and is visible only to owner accounts. It records authentication successes/failures, CSRF failures, password changes, account deletion attempts, setup restore events, exports, entry deletion, and image deletion. Audit remote IP extraction uses `NIKKI_IP_EXTRACTOR_MODE` and `NIKKI_TRUSTED_PROXY_CIDRS`, the same trust boundary as auth rate limiting. It must not contain diary title/body/tags, passwords, cookies, CSRF tokens, session tokens, request bodies, upload file paths, or SQL arguments. Rate-limit denials are structured stdout logs only, not persisted audit rows, to avoid database write amplification during attacks.
