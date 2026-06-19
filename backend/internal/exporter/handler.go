@@ -8,6 +8,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 
+	"github.com/shuuuumai96/nikki-shelf/backend/internal/audit"
 	"github.com/shuuuumai96/nikki-shelf/backend/internal/auth"
 	"github.com/shuuuumai96/nikki-shelf/backend/internal/entries"
 	"github.com/shuuuumai96/nikki-shelf/backend/internal/httpx"
@@ -16,10 +17,19 @@ import (
 
 type Handler struct {
 	service *Service
+	audit   *audit.Service
 }
 
-func NewHandler(service *Service) *Handler {
-	return &Handler{service: service}
+type HandlerConfig struct {
+	Audit *audit.Service
+}
+
+func NewHandler(service *Service, configs ...HandlerConfig) *Handler {
+	cfg := HandlerConfig{}
+	if len(configs) > 0 {
+		cfg = configs[0]
+	}
+	return &Handler{service: service, audit: cfg.Audit}
 }
 
 func (h *Handler) Register(api *echo.Group) {
@@ -28,10 +38,11 @@ func (h *Handler) Register(api *echo.Group) {
 }
 
 func (h *Handler) export(c echo.Context) error {
-	userID, ok := auth.UserID(c)
+	user, ok := auth.UserFromContext(c)
 	if !ok {
 		return httpx.ErrorWithKind(c, http.StatusUnauthorized, auth.ErrUnauthorized.Error(), "auth.unauthorized")
 	}
+	userID := user.ID
 
 	format := c.Param("format")
 	content, exporter, err := h.service.Export(c.Request().Context(), userID, format)
@@ -51,14 +62,23 @@ func (h *Handler) export(c echo.Context) error {
 		slog.String("format", format),
 		slog.Int("bytes_out", len(content)),
 	)
+	h.recordAudit(c, audit.Event{
+		EventType:     "export.completed",
+		Outcome:       audit.OutcomeSucceeded,
+		ActorUserID:   audit.UserID(user.ID),
+		ActorUsername: user.Username,
+		ActorRole:     user.Role,
+		Metadata:      audit.Metadata("format", format, "bytes_out", len(content)),
+	})
 	return c.Blob(http.StatusOK, exporter.ContentType(), content)
 }
 
 func (h *Handler) exportEntryMarkdown(c echo.Context) error {
-	userID, ok := auth.UserID(c)
+	user, ok := auth.UserFromContext(c)
 	if !ok {
 		return httpx.ErrorWithKind(c, http.StatusUnauthorized, auth.ErrUnauthorized.Error(), "auth.unauthorized")
 	}
+	userID := user.ID
 
 	entryID, err := strconv.ParseInt(c.Param("entryId"), 10, 64)
 	if err != nil {
@@ -80,5 +100,22 @@ func (h *Handler) exportEntryMarkdown(c echo.Context) error {
 		slog.String("entry_date", entry.EntryDate),
 		slog.Int("bytes_out", len(content)),
 	)
+	h.recordAudit(c, audit.Event{
+		EventType:     "export.entry_markdown.completed",
+		Outcome:       audit.OutcomeSucceeded,
+		ActorUserID:   audit.UserID(user.ID),
+		ActorUsername: user.Username,
+		ActorRole:     user.Role,
+		TargetType:    "entry",
+		TargetID:      strconv.FormatInt(entry.ID, 10),
+		Metadata:      audit.Metadata("bytes_out", len(content)),
+	})
 	return c.Blob(http.StatusOK, exporter.ContentType(), content)
+}
+
+func (h *Handler) recordAudit(c echo.Context, event audit.Event) {
+	if h.audit == nil {
+		return
+	}
+	h.audit.RecordHTTP(c, event)
 }

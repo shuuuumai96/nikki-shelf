@@ -168,6 +168,8 @@ Access to diary data and uploaded images is authenticated. File upload handling 
 
 Password changes require the current password, authenticated CSRF protection, and backend-side session revocation for every active session owned by that user.
 
+Security history is intentionally narrow. Owner accounts can review recent audit events for authentication, CSRF failures, password changes, account deletion, setup restore, export, entry deletion, and image deletion. Audit events keep event metadata, request IDs, remote IPs, reason codes, and target IDs only; they do not store diary title/body/tags, passwords, cookies, CSRF tokens, session tokens, request bodies, upload file paths, or raw SQL arguments. Rate-limit denials are structured stdout logs only, not persisted audit rows, to avoid database write amplification during attacks. Retention is bounded by `NIKKI_AUDIT_RETENTION_DAYS`.
+
 Operators are responsible for deployment security, backups, restore testing, and access control around the host. Nikki does not claim enterprise security, hardened SaaS security, or complete protection.
 
 ## 11. Known Limitations

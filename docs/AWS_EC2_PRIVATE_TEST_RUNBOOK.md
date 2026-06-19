@@ -123,6 +123,7 @@ NIKKI_SIGNUP_ENABLED=false
 NIKKI_FIRST_USER_SETUP_ENABLED=false
 NIKKI_FIRST_USER_BOOTSTRAP_TOKEN=<long-random-bootstrap-token>
 NIKKI_CORS_ALLOWED_ORIGINS=https://<your-exact-hostname>
+NIKKI_AUDIT_RETENTION_DAYS=180
 NIKKI_IP_EXTRACTOR_MODE=direct
 NIKKI_TRUSTED_PROXY_CIDRS=
 NIKKI_STRIP_IMAGE_METADATA=true
@@ -460,6 +461,7 @@ The private EC2 test may start only if all items are true:
 - `NIKKI_FIRST_USER_SETUP_ENABLED=false`.
 - `NIKKI_FIRST_USER_BOOTSTRAP_TOKEN` is set to a long random secret and is not a placeholder.
 - `NIKKI_CORS_ALLOWED_ORIGINS` is the exact HTTPS origin.
+- `NIKKI_AUDIT_RETENTION_DAYS` is set to a positive bounded value.
 - Backup positive test passes.
 - Invalid uploads volume backup test fails safely.
 - Age encryption positive test passes on EC2.

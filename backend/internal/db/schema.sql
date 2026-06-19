@@ -22,6 +22,26 @@ ALTER TABLE sessions ADD COLUMN IF NOT EXISTS csrf_hash TEXT NOT NULL DEFAULT ''
 CREATE INDEX IF NOT EXISTS idx_sessions_token_hash ON sessions(token_hash);
 CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at);
 
+CREATE TABLE IF NOT EXISTS audit_events (
+  id BIGSERIAL PRIMARY KEY,
+  event_type TEXT NOT NULL,
+  outcome TEXT NOT NULL,
+  actor_user_id BIGINT,
+  actor_username TEXT NOT NULL DEFAULT '',
+  actor_role TEXT NOT NULL DEFAULT '',
+  target_type TEXT NOT NULL DEFAULT '',
+  target_id TEXT NOT NULL DEFAULT '',
+  reason_kind TEXT NOT NULL DEFAULT '',
+  request_id TEXT NOT NULL DEFAULT '',
+  remote_ip TEXT NOT NULL DEFAULT '',
+  metadata_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_events_created_at ON audit_events(created_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_events_actor_user_id ON audit_events(actor_user_id);
+CREATE INDEX IF NOT EXISTS idx_audit_events_event_type ON audit_events(event_type);
+
 CREATE TABLE IF NOT EXISTS entries (
   id BIGSERIAL PRIMARY KEY,
   user_id BIGINT NOT NULL,

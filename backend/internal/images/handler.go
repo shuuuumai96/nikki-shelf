@@ -11,6 +11,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 
+	"github.com/shuuuumai96/nikki-shelf/backend/internal/audit"
 	"github.com/shuuuumai96/nikki-shelf/backend/internal/auth"
 	"github.com/shuuuumai96/nikki-shelf/backend/internal/httpx"
 	"github.com/shuuuumai96/nikki-shelf/backend/internal/logx"
@@ -20,10 +21,19 @@ const maxImageRequestBytes = MaxImageFileBytes + (1 << 20)
 
 type Handler struct {
 	service *Service
+	audit   *audit.Service
 }
 
-func NewHandler(service *Service) *Handler {
-	return &Handler{service: service}
+type HandlerConfig struct {
+	Audit *audit.Service
+}
+
+func NewHandler(service *Service, configs ...HandlerConfig) *Handler {
+	cfg := HandlerConfig{}
+	if len(configs) > 0 {
+		cfg = configs[0]
+	}
+	return &Handler{service: service, audit: cfg.Audit}
 }
 
 func (h *Handler) Register(api *echo.Group) {
@@ -78,10 +88,11 @@ func (h *Handler) upload(c echo.Context) error {
 }
 
 func (h *Handler) delete(c echo.Context) error {
-	userID, ok := auth.UserID(c)
+	user, ok := auth.UserFromContext(c)
 	if !ok {
 		return httpx.ErrorWithKind(c, http.StatusUnauthorized, auth.ErrUnauthorized.Error(), "auth.unauthorized")
 	}
+	userID := user.ID
 
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
@@ -93,6 +104,15 @@ func (h *Handler) delete(c echo.Context) error {
 	}
 
 	logx.Event(c, "images.deleted", slog.Int64("user_id", userID), slog.Int64("image_id", id))
+	h.recordAudit(c, audit.Event{
+		EventType:     "images.deleted",
+		Outcome:       audit.OutcomeSucceeded,
+		ActorUserID:   audit.UserID(user.ID),
+		ActorUsername: user.Username,
+		ActorRole:     user.Role,
+		TargetType:    "image",
+		TargetID:      strconv.FormatInt(id, 10),
+	})
 	return httpx.NoContent(c)
 }
 
@@ -168,4 +188,11 @@ func imageError(c echo.Context, err error) error {
 		return httpx.Internal(c, err)
 	}
 	return httpx.ErrorWithKind(c, status, err.Error(), KindFor(err))
+}
+
+func (h *Handler) recordAudit(c echo.Context, event audit.Event) {
+	if h.audit == nil {
+		return
+	}
+	h.audit.RecordHTTP(c, event)
 }

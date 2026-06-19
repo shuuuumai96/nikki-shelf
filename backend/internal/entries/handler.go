@@ -9,6 +9,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 
+	"github.com/shuuuumai96/nikki-shelf/backend/internal/audit"
 	"github.com/shuuuumai96/nikki-shelf/backend/internal/auth"
 	"github.com/shuuuumai96/nikki-shelf/backend/internal/httpx"
 	"github.com/shuuuumai96/nikki-shelf/backend/internal/logx"
@@ -17,10 +18,19 @@ import (
 
 type Handler struct {
 	service *Service
+	audit   *audit.Service
 }
 
-func NewHandler(service *Service) *Handler {
-	return &Handler{service: service}
+type HandlerConfig struct {
+	Audit *audit.Service
+}
+
+func NewHandler(service *Service, configs ...HandlerConfig) *Handler {
+	cfg := HandlerConfig{}
+	if len(configs) > 0 {
+		cfg = configs[0]
+	}
+	return &Handler{service: service, audit: cfg.Audit}
 }
 
 func (h *Handler) Register(api *echo.Group) {
@@ -208,10 +218,11 @@ func (h *Handler) update(c echo.Context) error {
 }
 
 func (h *Handler) delete(c echo.Context) error {
-	userID, ok := userID(c)
+	user, ok := auth.UserFromContext(c)
 	if !ok {
 		return unauthorized(c)
 	}
+	userID := user.ID
 
 	id, ok := entryID(c)
 	if !ok {
@@ -223,6 +234,15 @@ func (h *Handler) delete(c echo.Context) error {
 	}
 
 	logx.Event(c, "entries.deleted", slog.Int64("user_id", userID), slog.Int64("entry_id", id))
+	h.recordAudit(c, audit.Event{
+		EventType:     "entries.deleted",
+		Outcome:       audit.OutcomeSucceeded,
+		ActorUserID:   audit.UserID(user.ID),
+		ActorUsername: user.Username,
+		ActorRole:     user.Role,
+		TargetType:    "entry",
+		TargetID:      strconv.FormatInt(id, 10),
+	})
 	return httpx.NoContent(c)
 }
 
@@ -318,4 +338,11 @@ func entryJSONError(c echo.Context, err error) error {
 		return httpx.ErrorWithKind(c, http.StatusRequestEntityTooLarge, "request JSON is too large", "request.too_large")
 	}
 	return badJSON(c)
+}
+
+func (h *Handler) recordAudit(c echo.Context, event audit.Event) {
+	if h.audit == nil {
+		return
+	}
+	h.audit.RecordHTTP(c, event)
 }

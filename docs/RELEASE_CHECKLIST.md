@@ -48,6 +48,7 @@ docker compose -f docker-compose.check.yml run --rm checks
 | CSRF protects mutating authenticated requests | Authenticated `POST`, `PUT`, and `DELETE` requests require `X-CSRF-Token`; `GET` export/download routes still work without it |
 | Trusted proxy behavior is explicit | `NIKKI_IP_EXTRACTOR_MODE` and `NIKKI_TRUSTED_PROXY_CIDRS` match the deployed reverse proxy chain |
 | Auth rate limiting exists | `NIKKI_AUTH_RATE_LIMIT_IP_ATTEMPTS`, `NIKKI_AUTH_RATE_LIMIT_ACCOUNT_ATTEMPTS`, and `NIKKI_AUTH_RATE_LIMIT_WINDOW` protect login, signup, password change, account deletion, setup owner creation, and setup restore APIs |
+| Audit retention is configured | `NIKKI_AUDIT_RETENTION_DAYS` is present and positive; owner Settings can load recent security history |
 | Backup command exists | `scripts/backup-production.sh` creates a timestamped Nikki operational backup archive and detects the backend `/uploads` Docker volume when `UPLOADS_VOLUME` is not set |
 | Backup refuses missing uploads volume | `UPLOADS_VOLUME=missing-volume scripts/backup-production.sh` fails before running `tar` |
 | Backup artifacts are usable as one set | Backup creates a non-empty operational `.tar.gz` containing DB dump, uploads archive, manifest, and checksums from the same timestamp, or clearly warns if uploads are empty |
@@ -71,6 +72,7 @@ This gate is mandatory before opening Nikki to the public internet on the single
 | Logout works | Browser logout clears the session |
 | Re-login works | Existing user can log in again after logout |
 | Password change works | Existing user can change their password from Settings; current and other active sessions are invalidated and the user can log in again with the new password |
+| Security history works | Owner Settings shows recent audit events for login failure/success, password change, account deletion, setup restore, export, entry deletion, and image deletion without diary content or secrets |
 | Entry create/edit works | Create a diary entry, edit it, refresh, and confirm persisted content |
 | Memory shelf works | Confirm Today shows past entries for the signed-in user, `tired` and `sad` are hidden by default for new browser preferences, collapse/expand does not disable the feature, and opening a memory shows a direct return to Today |
 | Image upload/display/delete works | Upload an image, confirm it displays in reader and editor, delete it through the editor, and confirm it no longer displays |
@@ -87,7 +89,7 @@ This gate is mandatory before opening Nikki to the public internet on the single
 | Sample restored image returns 200 when authenticated | Authenticated request to a restored sample image returns HTTP `200` |
 | Public network exposure is limited | Security Group keeps `22/tcp`, `8080/tcp`, and `5432/tcp` closed; only `443/tcp` is required and `80/tcp` is temporary/optional |
 | Public Caddy proxy is correct | Caddy proxies to `127.0.0.1:8089`, uses public ACME TLS, enables compression, and allows setup restore uploads up to the backend restore upload limit |
-| Production safety env is set | `NIKKI_COOKIE_SECURE=true`, exact `NIKKI_CORS_ALLOWED_ORIGINS`, `NIKKI_SIGNUP_ENABLED=false`, `NIKKI_FIRST_USER_SETUP_ENABLED=false`, `NIKKI_FIRST_USER_BOOTSTRAP_TOKEN` is a long random secret, and `NIKKI_STRIP_IMAGE_METADATA=true` |
+| Production safety env is set | `NIKKI_COOKIE_SECURE=true`, exact `NIKKI_CORS_ALLOWED_ORIGINS`, `NIKKI_SIGNUP_ENABLED=false`, `NIKKI_FIRST_USER_SETUP_ENABLED=false`, `NIKKI_FIRST_USER_BOOTSTRAP_TOKEN` is a long random secret, `NIKKI_AUDIT_RETENTION_DAYS` is positive, and `NIKKI_STRIP_IMAGE_METADATA=true` |
 | Schema-changing release has backup first | Automatic idempotent schema setup is understood; do not add a migration framework unless an explicit task requests it |
 
 ## Unsupported In This Release

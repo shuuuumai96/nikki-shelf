@@ -1,5 +1,13 @@
 <script setup lang="ts">
-import { Download, KeyRound, LogOut, Trash2, X } from "lucide-vue-next";
+import {
+  Download,
+  KeyRound,
+  LogOut,
+  RefreshCw,
+  ShieldCheck,
+  Trash2,
+  X,
+} from "lucide-vue-next";
 import { computed, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import LanguageSelect from "../../../shared/components/LanguageSelect.vue";
@@ -14,17 +22,22 @@ import {
 } from "../../entries/memory-preferences";
 import { moodOrder, moodSpecs } from "../../entries/moods";
 import type { MoodKey } from "../../entries/types";
+import type { AuditEvent } from "../types";
 
 const props = defineProps<{
   error?: string;
   user: AuthUser;
   loading?: boolean;
+  securityEvents?: AuditEvent[];
+  securityEventsLoading?: boolean;
+  securityEventsError?: string;
 }>();
 
 const emit = defineEmits<{
   changePassword: [input: ChangePasswordInput];
   deleteAccount: [input: DeleteAccountInput];
   logout: [];
+  refreshSecurityEvents: [];
 }>();
 
 const { t } = useI18n();
@@ -43,6 +56,8 @@ const deleteForm = reactive({
   username: "",
   password: "",
 });
+const canViewSecurityEvents = computed(() => props.user.role === "owner");
+const visibleSecurityEvents = computed(() => props.securityEvents ?? []);
 
 const deleteUsernameMatches = computed(
   () =>
@@ -194,6 +209,115 @@ function validPasswordLength(value: string) {
   const length = value.trim().length;
   return length >= 8 && length <= 200;
 }
+
+function auditEventLabel(event: AuditEvent) {
+  const key = auditEventLabelKeys[event.eventType];
+  return key ? t(key) : event.eventType;
+}
+
+function auditOutcomeLabel(event: AuditEvent) {
+  return t(
+    event.outcome === "failed"
+      ? "settings.securityOutcomeFailed"
+      : "settings.securityOutcomeSucceeded",
+  );
+}
+
+function auditEventDetail(event: AuditEvent) {
+  const details = [
+    actorDetail(event),
+    event.remoteIp
+      ? t("settings.securityRemoteIp", { ip: event.remoteIp })
+      : "",
+    event.reasonKind
+      ? t("settings.securityReason", { reason: event.reasonKind })
+      : "",
+    targetDetail(event),
+    metadataDetail(event),
+  ].filter(Boolean);
+  return details.join(" / ");
+}
+
+function actorDetail(event: AuditEvent) {
+  if (event.actorUsername) {
+    return t("settings.securityActor", { actor: event.actorUsername });
+  }
+  if (event.actorUserId) {
+    return t("settings.securityActor", { actor: `#${event.actorUserId}` });
+  }
+  return "";
+}
+
+function targetDetail(event: AuditEvent) {
+  if (!event.targetType || !event.targetId) {
+    return "";
+  }
+  return t("settings.securityTarget", {
+    target: `${event.targetType} #${event.targetId}`,
+  });
+}
+
+function metadataDetail(event: AuditEvent) {
+  const metadata = event.metadata ?? {};
+  const keys = [
+    "format",
+    "entry_count",
+    "image_count",
+    "remaining_users",
+    "bytes_out",
+    "backup_size_bytes",
+  ];
+  return keys
+    .filter((key) => metadata[key])
+    .map((key) => `${metadataLabel(key)} ${metadata[key]}`)
+    .join(", ");
+}
+
+function metadataLabel(key: string) {
+  return t(auditMetadataLabelKeys[key] ?? "settings.securityMetadataValue");
+}
+
+function formatAuditTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return date.toLocaleString();
+}
+
+const auditEventLabelKeys: Record<string, string> = {
+  "auth.signup_succeeded": "settings.auditEvents.authSignupSucceeded",
+  "auth.signup_failed": "settings.auditEvents.authSignupFailed",
+  "auth.login_succeeded": "settings.auditEvents.authLoginSucceeded",
+  "auth.login_failed": "settings.auditEvents.authLoginFailed",
+  "auth.logout_succeeded": "settings.auditEvents.authLogoutSucceeded",
+  "auth.password_changed": "settings.auditEvents.authPasswordChanged",
+  "auth.password_change_failed":
+    "settings.auditEvents.authPasswordChangeFailed",
+  "auth.account_deleted": "settings.auditEvents.authAccountDeleted",
+  "auth.account_delete_failed": "settings.auditEvents.authAccountDeleteFailed",
+  "auth.csrf_failed": "settings.auditEvents.authCsrfFailed",
+  "auth.rate_limited": "settings.auditEvents.authRateLimited",
+  "setup.owner_created": "settings.auditEvents.setupOwnerCreated",
+  "setup.owner_create_failed": "settings.auditEvents.setupOwnerCreateFailed",
+  "setup.restore_verified": "settings.auditEvents.setupRestoreVerified",
+  "setup.restore_completed": "settings.auditEvents.setupRestoreCompleted",
+  "setup.restore_failed": "settings.auditEvents.setupRestoreFailed",
+  "export.completed": "settings.auditEvents.exportCompleted",
+  "export.entry_markdown.completed":
+    "settings.auditEvents.exportEntryMarkdownCompleted",
+  "entries.deleted": "settings.auditEvents.entriesDeleted",
+  "images.deleted": "settings.auditEvents.imagesDeleted",
+};
+
+const auditMetadataLabelKeys: Record<string, string> = {
+  format: "settings.securityMetadataFormat",
+  entry_count: "settings.securityMetadataEntries",
+  image_count: "settings.securityMetadataImages",
+  remaining_users: "settings.securityMetadataRemainingUsers",
+  bytes_out: "settings.securityMetadataBytes",
+  backup_size_bytes: "settings.securityMetadataBackupSize",
+};
 </script>
 
 <template>
@@ -380,6 +504,50 @@ function validPasswordLength(value: string) {
           </button>
         </div>
       </form>
+    </div>
+
+    <div v-if="canViewSecurityEvents" class="settings-block">
+      <div class="security-head">
+        <h2>{{ t("settings.securityHistory") }}</h2>
+        <button
+          class="icon-button"
+          type="button"
+          :aria-label="t('settings.securityRefresh')"
+          :disabled="securityEventsLoading"
+          @click="emit('refreshSecurityEvents')"
+        >
+          <RefreshCw :size="16" stroke-width="1.8" />
+        </button>
+      </div>
+      <p v-if="securityEventsLoading" class="security-state">
+        {{ t("settings.securityLoading") }}
+      </p>
+      <p v-else-if="securityEventsError" class="security-error">
+        {{ securityEventsError }}
+      </p>
+      <p v-else-if="visibleSecurityEvents.length === 0" class="security-state">
+        {{ t("settings.securityEmpty") }}
+      </p>
+      <ol v-else class="security-list">
+        <li v-for="event in visibleSecurityEvents" :key="event.id">
+          <div class="security-event-main">
+            <ShieldCheck :size="15" stroke-width="1.8" />
+            <strong>{{ auditEventLabel(event) }}</strong>
+            <span
+              class="security-outcome"
+              :class="{ failed: event.outcome === 'failed' }"
+            >
+              {{ auditOutcomeLabel(event) }}
+            </span>
+          </div>
+          <time :datetime="event.createdAt">
+            {{ formatAuditTime(event.createdAt) }}
+          </time>
+          <p v-if="auditEventDetail(event)">
+            {{ auditEventDetail(event) }}
+          </p>
+        </li>
+      </ol>
     </div>
 
     <div class="settings-block">
@@ -580,6 +748,92 @@ h2 {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
+}
+
+.security-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.security-head h2 {
+  margin-bottom: 0;
+}
+
+.security-list {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.security-list li {
+  display: grid;
+  gap: 5px;
+  border-top: 1px solid var(--border-subtle);
+  padding: 12px 0;
+}
+
+.security-list li:first-child {
+  border-top: 0;
+}
+
+.security-event-main {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+}
+
+.security-event-main strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.security-event-main svg {
+  flex: 0 0 auto;
+  color: var(--color-muted);
+}
+
+.security-outcome {
+  flex: 0 0 auto;
+  margin-left: auto;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--color-muted);
+  padding: 2px 6px;
+  font-size: 11px;
+}
+
+.security-outcome.failed {
+  border-color: var(--color-danger-border);
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+.security-list time,
+.security-list p,
+.security-state,
+.security-error {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.security-error {
+  border: 1px solid var(--color-danger-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+  padding: 8px 10px;
 }
 
 .danger-panel {

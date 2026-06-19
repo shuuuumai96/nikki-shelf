@@ -22,6 +22,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/shuuuumai96/nikki-shelf/backend/internal/audit"
 	"github.com/shuuuumai96/nikki-shelf/backend/internal/httpx"
 	"github.com/shuuuumai96/nikki-shelf/backend/internal/logx"
 )
@@ -1148,6 +1149,82 @@ func TestRateLimiterBlocksAfterLimitAndResets(t *testing.T) {
 	}
 }
 
+func TestRateLimitedLoginDoesNotWritePersistentAuditEvent(t *testing.T) {
+	repo := newFakeAuthRepo(1)
+	auditRepo := &fakeAuditRepo{}
+	limiter := NewRateLimiter(RateLimiterConfig{
+		IPAttempts:      1,
+		AccountAttempts: 1,
+		Window:          time.Minute,
+		Lockout:         time.Minute,
+		Extractor:       NewClientIPExtractor("direct", nil),
+	})
+	service := NewService(repo)
+	handler := NewHandler(service, HandlerConfig{
+		Audit:       audit.NewService(auditRepo),
+		RateLimiter: limiter,
+	})
+	server := echo.New()
+	api := server.Group("/api")
+	handler.Register(api)
+
+	for i := 0; i < 2; i++ {
+		response := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(`{"username":"tester","password":"wrong-password"}`))
+		request.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+		request.RemoteAddr = "203.0.113.10:1234"
+		server.ServeHTTP(response, request)
+	}
+
+	if len(auditRepo.inserted) != 1 {
+		t.Fatalf("audit events = %d, want only first auth failure persisted", len(auditRepo.inserted))
+	}
+	if got := auditRepo.inserted[0].EventType; got != "auth.login_failed" {
+		t.Fatalf("event type = %q, want auth.login_failed", got)
+	}
+}
+
+func TestInvalidLoginJSONDoesNotWritePersistentAuditEvent(t *testing.T) {
+	auditRepo := &fakeAuditRepo{}
+	server := echo.New()
+	api := server.Group("/api")
+	NewHandler(NewService(newFakeAuthRepo(1)), HandlerConfig{
+		Audit: audit.NewService(auditRepo),
+	}).Register(api)
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(`{`))
+	request.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	server.ServeHTTP(response, request)
+
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d; body=%s", response.Code, http.StatusBadRequest, response.Body.String())
+	}
+	if len(auditRepo.inserted) != 0 {
+		t.Fatalf("audit events = %d, want 0", len(auditRepo.inserted))
+	}
+}
+
+func TestUnauthenticatedCSRFFailureDoesNotWritePersistentAuditEvent(t *testing.T) {
+	auditRepo := &fakeAuditRepo{}
+	server := echo.New()
+	api := server.Group("/api")
+	NewHandler(NewService(newFakeAuthRepo(1)), HandlerConfig{
+		Audit: audit.NewService(auditRepo),
+	}).Register(api)
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/auth/logout", nil)
+	server.ServeHTTP(response, request)
+
+	if response.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want %d; body=%s", response.Code, http.StatusForbidden, response.Body.String())
+	}
+	if len(auditRepo.inserted) != 0 {
+		t.Fatalf("audit events = %d, want 0", len(auditRepo.inserted))
+	}
+}
+
 func TestRateLimiterBoundsMapSize(t *testing.T) {
 	limiter := NewRateLimiter(RateLimiterConfig{
 		IPAttempts:      100,
@@ -1831,4 +1908,21 @@ type fakeAccountFileDeleter struct {
 func (d *fakeAccountFileDeleter) Delete(_ context.Context, path string) error {
 	d.deleted = append(d.deleted, path)
 	return nil
+}
+
+type fakeAuditRepo struct {
+	inserted []audit.Event
+}
+
+func (r *fakeAuditRepo) Insert(_ context.Context, event audit.Event) error {
+	r.inserted = append(r.inserted, event)
+	return nil
+}
+
+func (r *fakeAuditRepo) List(_ context.Context, _ int) ([]audit.Event, error) {
+	return nil, nil
+}
+
+func (r *fakeAuditRepo) DeleteOlderThan(_ context.Context, _ time.Time) (int64, error) {
+	return 0, nil
 }

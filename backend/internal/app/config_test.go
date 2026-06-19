@@ -16,6 +16,7 @@ func TestLoadConfigSecurityOptions(t *testing.T) {
 	t.Setenv("NIKKI_AUTH_RATE_LIMIT_ACCOUNT_ATTEMPTS", "4")
 	t.Setenv("NIKKI_AUTH_RATE_LIMIT_WINDOW", "2m")
 	t.Setenv("NIKKI_AUTH_RATE_LIMIT_LOCKOUT", "10m")
+	t.Setenv("NIKKI_AUDIT_RETENTION_DAYS", "365")
 	t.Setenv("NIKKI_IP_EXTRACTOR_MODE", "x-real-ip")
 	t.Setenv("NIKKI_TRUSTED_PROXY_CIDRS", "127.0.0.1/32")
 	t.Setenv("NIKKI_STRIP_IMAGE_METADATA", "true")
@@ -51,6 +52,9 @@ func TestLoadConfigSecurityOptions(t *testing.T) {
 	}
 	if cfg.AuthRateLimitLockout != 10*time.Minute {
 		t.Fatalf("AuthRateLimitLockout = %s, want 10m", cfg.AuthRateLimitLockout)
+	}
+	if cfg.AuditRetentionDays != 365 {
+		t.Fatalf("AuditRetentionDays = %d, want 365", cfg.AuditRetentionDays)
 	}
 	if cfg.IPExtractorMode != "x-real-ip" {
 		t.Fatalf("IPExtractorMode = %q, want x-real-ip", cfg.IPExtractorMode)
@@ -111,6 +115,17 @@ func TestLoadConfigRejectsInvalidImageQuota(t *testing.T) {
 
 func TestLoadConfigRejectsNonNumericImageQuota(t *testing.T) {
 	t.Setenv("NIKKI_IMAGE_USER_QUOTA_COUNT", "many")
+
+	defer func() {
+		if recover() == nil {
+			t.Fatal("LoadConfig did not panic")
+		}
+	}()
+	_ = LoadConfig()
+}
+
+func TestLoadConfigRejectsInvalidAuditRetention(t *testing.T) {
+	t.Setenv("NIKKI_AUDIT_RETENTION_DAYS", "0")
 
 	defer func() {
 		if recover() == nil {

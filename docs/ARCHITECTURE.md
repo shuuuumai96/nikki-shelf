@@ -4,7 +4,7 @@
 
 Nikki is a self-hosted, text-first diary for daily personal records. It is designed for one person or a small trusted household, with PC-browser writing as the primary experience, recoverable self-hosted data, and desktop-supported safe image attachments.
 
-The current release is intentionally small. It supports daily text writing, tags, moods, basic past-entry search, a small random memory shelf, normal single-tab autosave, desktop image attachments, app-level backup export, first-setup operational restore, image consistency cleanup, and limited installable web app behavior.
+The current release is intentionally small. It supports daily text writing, tags, moods, basic past-entry search, a small random memory shelf, normal single-tab autosave, desktop image attachments, app-level backup export, first-setup operational restore, owner-visible security history, image consistency cleanup, and limited installable web app behavior.
 
 ## 2. Runtime Components
 
@@ -12,7 +12,7 @@ The current release is intentionally small. It supports daily text writing, tags
 - `frontend/nginx/default.conf`: nginx configuration. It serves the frontend and proxies `/api/` and legacy `/uploads/` image requests to the backend service.
 - `frontend/public/manifest.webmanifest` and `frontend/public/sw.js`: limited installability metadata and basic static app-shell caching. The service worker must not cache authenticated API responses, uploads, or diary data.
 - `backend/`: Go application using Echo and pgx-compatible PostgreSQL access through `database/sql`.
-- PostgreSQL: stores users, sessions, diary entries, image metadata, and settings.
+- PostgreSQL: stores users, sessions, audit events, diary entries, image metadata, and settings.
 - Uploads storage: stores image files in `NIKKI_UPLOAD_DIR`; Docker Compose mounts this as the `nikki_uploads` volume.
 - `docker-compose.yml`: starts PostgreSQL, backend, and frontend containers.
 
@@ -29,6 +29,7 @@ Default exposed ports in `docker-compose.yml`:
 │   ├── cmd/server/                  # server entry point and cleanup-images subcommand
 │   ├── internal/app/                # runtime setup, config, cleanup command
 │   ├── internal/auth/               # users and sessions
+│   ├── internal/audit/              # security history persistence and owner API
 │   ├── internal/db/                 # database open, migration, schema.sql
 │   ├── internal/entries/            # diary entry API, service, repository
 │   ├── internal/exporter/           # backup/export archive generation
@@ -63,11 +64,14 @@ Core entities are defined in `backend/internal/db/schema.sql`.
 
 - `users`: application users. Each user has a unique username and password hash.
 - `sessions`: login sessions. Each session belongs to a user and is removed when the user is deleted or changes their password.
+- `audit_events`: bounded security history for authentication, account deletion, CSRF failures, setup restore, export, entry deletion, and image deletion events. It stores event metadata only, not diary content or secrets. Rate-limit denials stay in structured stdout logs to avoid database write amplification during attacks.
 - `entries`: diary entries. Each entry belongs to a user, has a unique `(user_id, entry_date)` pair, stores title, body, mood, tags JSON, and a `version` for stale update detection.
 - `images`: image attachment metadata. Each image belongs to an entry, stores the disk file path, public URL, original/safe file name, size, MIME type, and creation time.
 - `settings`: key/value settings table.
 
 Images are related to entries through `images.entry_id`. Entries are related to users through `entries.user_id`. Sessions are related to users through `sessions.user_id`.
+
+Audit events intentionally keep `actor_user_id` as event metadata rather than a foreign key so account deletion can preserve the fact that a deleted account performed the deleted-account operation. Old audit rows are pruned on backend startup according to `NIKKI_AUDIT_RETENTION_DAYS`, which defaults to 180 days.
 
 ## 5. Entry Lifecycle
 
